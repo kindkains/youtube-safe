@@ -1,6 +1,6 @@
 # youtube-safe — Design-Spezifikation
 
-**Stand:** 2026-11-08 · **Status:** vom Auftraggeber abschnittsweise freigegeben, Review des Gesamtdokuments ausstehend
+**Stand:** 2026-11-08 · **Status:** vom Auftraggeber abschnittsweise und am 2026-11-09 als Gesamtdokument freigegeben
 **Arbeitstitel:** `youtube-safe` (nur privat; vor einer Veröffentlichung umbenennen, kein „YouTube“ im Namen)
 
 ## 1. Ziel und Rahmen
