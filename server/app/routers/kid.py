@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import clock, events
 from app.config import get_settings
 from app.db import get_session
-from app.deps import current_child
-from app.models import Child, ContentRequest, Device, PairingCode, STATUS_OPEN
+from app.deps import current_child, current_device
+from app.models import Child, ContentRequest, Device, DeviceEvent, PairingCode, STATUS_OPEN, WatchSession
 from app.routers.parent_children import child_out
 from app.routers.parent_requests import request_out
 from app.rules import rules_for_child
-from app.schemas import KidRuleOut, KidStateOut, PairIn, PairOut, RequestIn, RequestOut
+from app.schemas import EventIn, KidRuleOut, KidStateOut, PairIn, PairOut, RequestIn, RequestOut, WatchBatchIn
 from app.security import hash_token, new_token
 
 router = APIRouter(prefix="/kid", tags=["kid"])
@@ -112,3 +114,53 @@ def my_requests(child: Child = Depends(current_child), session: Session = Depend
         .limit(100)
     )
     return [request_out(session, r) for r in rows]
+
+
+DISTURBANCE_INTERVAL = timedelta(hours=6)
+
+
+@router.post("/watch", status_code=status.HTTP_204_NO_CONTENT)
+def report_watch(
+    data: WatchBatchIn, child: Child = Depends(current_child), session: Session = Depends(get_session)
+) -> Response:
+    now = clock.now()
+    for item in data.entries:
+        existing = session.scalar(select(WatchSession).where(WatchSession.client_id == item.client_id))
+        if existing is None:
+            session.add(
+                WatchSession(
+                    child_id=child.id,
+                    client_id=item.client_id,
+                    video_id=item.video_id,
+                    channel_id=item.channel_id,
+                    title=item.title,
+                    channel_name=item.channel_name,
+                    started_at=item.started_at,
+                    played_seconds=item.played_seconds,
+                    in_reward_mode=child.reward_active(now),
+                    updated_at=now,
+                )
+            )
+            session.flush()
+        elif existing.child_id == child.id:
+            existing.played_seconds = max(existing.played_seconds, item.played_seconds)
+            existing.updated_at = now
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/events", status_code=status.HTTP_204_NO_CONTENT)
+def report_event(
+    data: EventIn,
+    device: Device = Depends(current_device),
+    session: Session = Depends(get_session),
+) -> Response:
+    now = clock.now()
+    session.add(DeviceEvent(device_id=device.id, kind=data.kind, detail=data.detail, created_at=now))
+    child = session.get(Child, device.child_id)
+    last = child.disturbance_notified_at
+    if data.kind == "extractor_error" and (last is None or now - last >= DISTURBANCE_INTERVAL):
+        child.disturbance_notified_at = now
+        events.disturbance(session, child, data.detail)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
