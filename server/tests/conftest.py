@@ -21,7 +21,7 @@ from datetime import datetime  # noqa: E402
 
 import pytest  # noqa: E402
 
-from app import clock  # noqa: E402
+from app import clock, notify  # noqa: E402
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.models import Child, Parent  # noqa: E402
 from app.security import hash_password, new_topic  # noqa: E402
@@ -52,6 +52,19 @@ def fresh_database():
     Base.metadata.create_all(engine)
     yield
     Base.metadata.drop_all(engine)
+
+
+@pytest.fixture(autouse=True)
+def pushes(monkeypatch):
+    """Fängt alle Push-Nachrichten ab, statt sie an ntfy zu schicken."""
+    sent: list[dict] = []
+
+    def fake_send_push(topic, title, message, *, tags=(), priority=3):
+        sent.append({"topic": topic, "title": title, "message": message, "tags": list(tags)})
+        return True
+
+    monkeypatch.setattr(notify, "send_push", fake_send_push)
+    return sent
 
 
 @pytest.fixture
