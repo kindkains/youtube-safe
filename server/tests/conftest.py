@@ -92,3 +92,28 @@ def make_child(db, name="Mia"):
     db.add(child)
     db.commit()
     return child
+
+
+@pytest.fixture
+def client():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    return TestClient(app)
+
+
+@pytest.fixture
+def parent(db):
+    return make_parent(db)
+
+
+def login(client, email="jessica@example.org", password="geheim123") -> dict:
+    response = client.post("/api/v1/parent/login", json={"email": email, "password": password})
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['token']}"}
+
+
+@pytest.fixture
+def parent_headers(client, parent):
+    return login(client)
