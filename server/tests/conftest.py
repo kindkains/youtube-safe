@@ -130,3 +130,28 @@ def login(client, email="jessica@example.org", password="geheim123") -> dict:
 @pytest.fixture
 def parent_headers(client, parent):
     return login(client)
+
+
+def create_child(client, parent_headers, name="Mia") -> dict:
+    response = client.post("/api/v1/parent/children", headers=parent_headers, json={"name": name})
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def pair_kid(client, parent_headers, child_id: int, app_version="1.0.0") -> dict:
+    code = client.post(
+        f"/api/v1/parent/children/{child_id}/pairing-code", headers=parent_headers
+    ).json()["code"]
+    response = client.post("/api/v1/kid/pair", json={"code": code, "app_version": app_version})
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['token']}"}
+
+
+@pytest.fixture
+def child(client, parent_headers):
+    return create_child(client, parent_headers)
+
+
+@pytest.fixture
+def kid_headers(client, parent_headers, child):
+    return pair_kid(client, parent_headers, child["id"])

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.routers import parent_admin, parent_auth
+from app.routers import kid, parent_admin, parent_auth, parent_children
 
 API_PREFIX = "/api/v1"
 
 app = FastAPI(title="youtube-safe")
-app.include_router(parent_auth.router, prefix=API_PREFIX)
-app.include_router(parent_admin.router, prefix=API_PREFIX)
+for router in (parent_auth.router, parent_admin.router, parent_children.router, kid.router):
+    app.include_router(router, prefix=API_PREFIX)
 
 
 @app.get("/health")
