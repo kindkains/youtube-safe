@@ -12,6 +12,7 @@ from app.db import get_session
 from app.deps import current_child
 from app.models import Child, Device, PairingCode
 from app.routers.parent_children import child_out
+from app.rules import rules_for_child
 from app.schemas import KidRuleOut, KidStateOut, PairIn, PairOut
 from app.security import hash_token, new_token
 
@@ -51,8 +52,6 @@ def pair(data: PairIn, session: Session = Depends(get_session)) -> PairOut:
 
 @router.get("/state", response_model=KidStateOut)
 def state(child: Child = Depends(current_child), session: Session = Depends(get_session)) -> KidStateOut:
-    from app.rules import rules_for_child
-
     return KidStateOut(
         server_time=clock.now(),
         child=child_out(child),
