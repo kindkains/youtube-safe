@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.routers import kid, parent_admin, parent_auth, parent_children, parent_rules
+from app.routers import kid, parent_admin, parent_auth, parent_children, parent_requests, parent_rules
 
 API_PREFIX = "/api/v1"
 
@@ -14,6 +14,7 @@ for router in (
     parent_admin.router,
     parent_children.router,
     parent_rules.router,
+    parent_requests.router,
     kid.router,
 ):
     app.include_router(router, prefix=API_PREFIX)
