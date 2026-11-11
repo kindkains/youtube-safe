@@ -1,0 +1,6 @@
+# Lesen darf, wer den (zufälligen) Topic-Namen kennt; schreiben nur der Server-Benutzer.
+auth-file: /var/lib/ntfy/user.db
+auth-default-access: read-only
+cache-file: /var/lib/ntfy/cache.db
+cache-duration: 24h
+behind-proxy: true

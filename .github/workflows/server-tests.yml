@@ -1,0 +1,21 @@
+name: Server-Tests
+
+on:
+  push:
+    paths: ["server/**", "shared/**", ".github/workflows/server-tests.yml"]
+  pull_request:
+    paths: ["server/**", "shared/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest

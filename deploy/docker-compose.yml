@@ -1,0 +1,55 @@
+# youtube-safe: Server, Datenbank, Push.
+# Start:  docker compose --env-file .env up -d --build
+services:
+  app:
+    build: ../server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: db
+      NTFY_URL: http://ntfy
+      YTS_UPDATES_DIR: /srv/updates
+    volumes:
+      - ./updates:/srv/updates:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${YTS_APP_PORT:-8090}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${MARIADB_DATABASE:?MARIADB_DATABASE fehlt}
+      MARIADB_USER: ${MARIADB_USER:?MARIADB_USER fehlt}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:?MARIADB_PASSWORD fehlt}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?MARIADB_ROOT_PASSWORD fehlt}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ntfy:
+    image: binwiederhier/ntfy:v2.11.0
+    restart: unless-stopped
+    command: serve
+    environment:
+      NTFY_BASE_URL: ${NTFY_PUBLIC_URL:?NTFY_PUBLIC_URL fehlt}
+    volumes:
+      - ./ntfy/server.yml:/etc/ntfy/server.yml:ro
+      - ntfy-data:/var/lib/ntfy
+    ports:
+      - "127.0.0.1:${YTS_NTFY_PORT:-8091}:80"
+
+volumes:
+  db-data:
+  ntfy-data:
