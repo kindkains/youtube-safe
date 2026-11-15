@@ -5,6 +5,8 @@
 # (safetube-app:8080, safetube-ntfy:80). Die Dienstnamen sind bewusst eindeutig:
 # Compose trägt sie in jedem Netz als DNS-Alias ein, und in `paqo-net` gibt es
 # bereits einen anderen Container `ntfy`. Die Datenbank bleibt im internen Netz.
+name: safetube
+
 services:
   safetube-app:
     build: ../server
