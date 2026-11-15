@@ -1,21 +1,28 @@
 # youtube-safe: Server, Datenbank, Push.
 # Start:  docker compose --env-file .env up -d --build
+#
+# NPM erreicht App und Push über das gemeinsame Netz `paqo-net` per Containername
+# (safetube-app:8080, safetube-ntfy:80). Die Dienstnamen sind bewusst eindeutig:
+# Compose trägt sie in jedem Netz als DNS-Alias ein, und in `paqo-net` gibt es
+# bereits einen anderen Container `ntfy`. Die Datenbank bleibt im internen Netz.
 services:
-  app:
+  safetube-app:
     build: ../server
+    container_name: safetube-app
     restart: unless-stopped
     env_file: .env
     environment:
       DB_HOST: db
-      NTFY_URL: http://ntfy
+      NTFY_URL: http://safetube-ntfy
       YTS_UPDATES_DIR: /srv/updates
     volumes:
       - ./updates:/srv/updates:ro
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:${YTS_APP_PORT:-8090}:8080"
+    networks:
+      - default
+      - proxy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
       interval: 30s
@@ -32,14 +39,17 @@ services:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?MARIADB_ROOT_PASSWORD fehlt}
     volumes:
       - db-data:/var/lib/mysql
+    networks:
+      - default
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-  ntfy:
+  safetube-ntfy:
     image: binwiederhier/ntfy:v2.11.0
+    container_name: safetube-ntfy
     restart: unless-stopped
     command: serve
     environment:
@@ -47,8 +57,15 @@ services:
     volumes:
       - ./ntfy/server.yml:/etc/ntfy/server.yml:ro
       - ntfy-data:/var/lib/ntfy
-    ports:
-      - "127.0.0.1:${YTS_NTFY_PORT:-8091}:80"
+    networks:
+      - default
+      - proxy
+
+networks:
+  default:
+  proxy:
+    external: true
+    name: ${YTS_PROXY_NETWORK:-paqo-net}
 
 volumes:
   db-data:
