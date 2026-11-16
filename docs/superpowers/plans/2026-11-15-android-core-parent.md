@@ -1759,7 +1759,7 @@ package de.safetube.core.api
 
 import java.time.Instant
 
-/** Alle Aufrufe der Eltern-App an den Server (`/api/v1/parent/*`). */
+/** Alle Aufrufe der Eltern-App an den Server (`/api/v1/parent/…`). */
 interface ParentApi {
     suspend fun login(email: String, password: String): LoginResponse
     suspend fun logout()
