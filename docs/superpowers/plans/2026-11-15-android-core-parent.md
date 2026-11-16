@@ -3161,7 +3161,7 @@ internal object Mapping {
         audio: List<AudioStream>,
         hlsUrl: String?,
     ): List<StreamCandidate> = buildList {
-        videos.filter { it.isUrl && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP && !it.isVideoOnly }
+        videos.filter { it.isUrl && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP && !it.isVideoOnly() }
             .forEach { add(StreamCandidate(it.content, StreamKind.MUXED, height(it), 0, it.format?.mimeType)) }
         videoOnly.filter { it.isUrl && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP }
             .forEach { add(StreamCandidate(it.content, StreamKind.VIDEO_ONLY, height(it), 0, it.format?.mimeType)) }
@@ -3175,7 +3175,7 @@ internal object Mapping {
 
     private fun height(stream: VideoStream): Int =
         stream.height.takeIf { it > 0 }
-            ?: RESOLUTION_HEIGHT.find(stream.resolution.orEmpty())?.groupValues?.get(1)?.toInt()
+            ?: RESOLUTION_HEIGHT.find(stream.getResolution().orEmpty())?.groupValues?.get(1)?.toInt()
             ?: 0
 }
 ```
