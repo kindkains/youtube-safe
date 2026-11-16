@@ -15,7 +15,8 @@ from app.deps import current_child, current_device
 from app.models import Child, ContentRequest, Device, DeviceEvent, PairingCode, STATUS_OPEN, WatchSession
 from app.routers.parent_children import child_out
 from app.routers.parent_requests import request_out
-from app.rules import rules_for_child
+from app.gate import decide
+from app.rules import as_views, rules_for_child
 from app.schemas import EventIn, KidRuleOut, KidStateOut, PairIn, PairOut, RequestIn, RequestOut, WatchBatchIn
 from app.security import hash_token, new_token
 
@@ -68,6 +69,18 @@ def _content_url(target_type: str, target_id: str) -> str:
     return f"https://www.youtube.com/watch?v={target_id}"
 
 
+def _blocked_by_rule(session: Session, child_id: int, data: RequestIn) -> bool:
+    """Gilt für das Ziel gerade eine Sperrregel (nicht nur „nicht freigegeben“)?"""
+    if data.target_type == "video":
+        video_id, channel_id = data.target_id, data.channel_id
+    else:
+        video_id, channel_id = "", data.target_id
+    decision = decide(as_views(rules_for_child(session, child_id)), child_id=child_id,
+                      video_id=video_id, channel_id=channel_id,
+                      reward_active=False, reward_includes_blocked=False)
+    return decision.reason in ("video_block", "channel_block")
+
+
 @router.post("/requests", response_model=RequestOut, status_code=status.HTTP_201_CREATED)
 def create_request(
     data: RequestIn, child: Child = Depends(current_child), session: Session = Depends(get_session)
@@ -83,6 +96,7 @@ def create_request(
     if existing is not None:
         return request_out(session, existing)
     request = ContentRequest(
+        lifts_block=_blocked_by_rule(session, child.id, data),
         child_id=child.id,
         target_type=data.target_type,
         target_id=data.target_id,

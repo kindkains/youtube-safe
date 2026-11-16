@@ -84,3 +84,47 @@ def test_unknown_child_404(client, parent_headers):
     assert client.patch(
         "/api/v1/parent/children/999", headers=parent_headers, json={"name": "X"}
     ).status_code == 404
+
+
+# --- Kind löschen -----------------------------------------------------------------
+
+
+def test_delete_child_removes_everything(client, parent_headers, child, kid_headers, pushes):
+    other = create_child(client, parent_headers, "Antonio")
+    cid = child["id"]
+    client.post("/api/v1/parent/rules", headers=parent_headers,
+                json={"child_id": cid, "target_type": "video", "target_id": "v1", "effect": "allow"})
+    client.post("/api/v1/parent/rules", headers=parent_headers,
+                json={"child_id": None, "target_type": "video", "target_id": "v2", "effect": "allow"})
+    client.post("/api/v1/kid/requests", headers=kid_headers,
+                json={"target_type": "video", "target_id": "v3"})
+    client.post("/api/v1/kid/watch", headers=kid_headers, json={"entries": [
+        {"client_id": "sitzung-1", "video_id": "v1", "started_at": "2026-11-08T10:00:00Z",
+         "played_seconds": 60}
+    ]})
+    client.post("/api/v1/kid/events", headers=kid_headers, json={"kind": "extractor_error", "detail": "x"})
+    client.post(f"/api/v1/parent/children/{cid}/pairing-code", headers=parent_headers)
+
+    response = client.delete(f"/api/v1/parent/children/{cid}", headers=parent_headers)
+    assert response.status_code == 204
+
+    children = client.get("/api/v1/parent/children", headers=parent_headers).json()
+    assert [c["id"] for c in children] == [other["id"]]
+    rules = client.get("/api/v1/parent/rules", headers=parent_headers).json()
+    assert [r["target_id"] for r in rules] == ["v2"]  # Regel für alle Kinder bleibt
+    assert client.get("/api/v1/parent/requests", headers=parent_headers).json() == []
+    # Das Gerät des gelöschten Kindes ist sofort abgemeldet.
+    assert client.get("/api/v1/kid/state", headers=kid_headers).status_code == 401
+
+
+def test_delete_child_tells_device(client, parent_headers, child, kid_headers, pushes):
+    client.delete(f"/api/v1/parent/children/{child['id']}", headers=parent_headers)
+    assert any("unpaired" in p["tags"] for p in pushes)
+
+
+def test_delete_unknown_child_is_404(client, parent_headers):
+    assert client.delete("/api/v1/parent/children/999", headers=parent_headers).status_code == 404
+
+
+def test_delete_child_needs_parent(client, child, kid_headers):
+    assert client.delete(f"/api/v1/parent/children/{child['id']}", headers=kid_headers).status_code == 401

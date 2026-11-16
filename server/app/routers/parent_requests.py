@@ -42,6 +42,7 @@ def request_out(session: Session, request: ContentRequest) -> RequestOut:
         source_video_id=request.source_video_id,
         source_video_title=request.source_video_title,
         status=request.status,
+        lifts_block=request.lifts_block,
         decided_by_name=decider.name if decider else None,
         decided_at=request.decided_at,
         reason=request.reason,
@@ -98,7 +99,15 @@ def decide_request(
     child = session.get(Child, request.child_id)
     rule_child_id = None if data.scope == "all" else request.child_id
 
+    def drop_childs_block(target_type: str, target_id: str) -> None:
+        # Bei „alle Kinder“ würde eine Sperre nur für dieses Kind die Freigabe schlagen.
+        if rule_child_id is None:
+            own = find_rule(session, request.child_id, target_type, target_id)
+            if own is not None and own.effect == EFFECT_BLOCK:
+                session.delete(own)
+
     if data.action == "approve":
+        drop_childs_block(request.target_type, request.target_id)
         upsert_rule(session, child_id=rule_child_id, target_type=request.target_type,
                     target_id=request.target_id, effect=EFFECT_ALLOW, title=request.title,
                     channel_name=request.channel_name, parent_id=parent.id)
@@ -106,6 +115,7 @@ def decide_request(
     elif data.action == "approve_video_only":
         if request.target_type != "channel" or not request.source_video_id:
             raise HTTPException(400, "Zu dieser Anfrage gibt es kein einzelnes Video")
+        drop_childs_block("video", request.source_video_id)
         upsert_rule(session, child_id=rule_child_id, target_type="video",
                     target_id=request.source_video_id, effect=EFFECT_ALLOW,
                     title=request.source_video_title, channel_name=request.channel_name,

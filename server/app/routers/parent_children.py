@@ -6,14 +6,23 @@ import json
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app import clock, events
 from app.config import get_settings
 from app.db import get_session
 from app.deps import current_parent, get_child_or_404
-from app.models import Child, Device, PairingCode, Parent
+from app.models import (
+    Child,
+    ContentRequest,
+    Device,
+    DeviceEvent,
+    PairingCode,
+    Parent,
+    Rule,
+    WatchSession,
+)
 from app.schemas import ChildCreate, ChildOut, ChildUpdate, DeviceOut, PairingCodeOut
 from app.security import hash_token, new_pairing_code, new_topic
 
@@ -77,6 +86,26 @@ def update_child(
     session.commit()
     events.sync_child(child)
     return child_out(child)
+
+
+@router.delete("/children/{child_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_child(
+    child_id: int, _: Parent = Depends(current_parent), session: Session = Depends(get_session)
+) -> Response:
+    """Löscht das Kind mit allem, was nur zu ihm gehört. Regeln für alle Kinder bleiben.
+
+    Die abhängigen Zeilen werden ausdrücklich gelöscht, statt sich auf ON DELETE CASCADE
+    zu verlassen: SQLite (Tests) setzt Fremdschlüssel nur mit eigenem PRAGMA durch.
+    """
+    child = get_child_or_404(session, child_id)
+    events.child_deleted(child)
+    device_ids = select(Device.id).where(Device.child_id == child_id)
+    session.execute(delete(DeviceEvent).where(DeviceEvent.device_id.in_(device_ids)))
+    for model in (Device, PairingCode, Rule, ContentRequest, WatchSession):
+        session.execute(delete(model).where(model.child_id == child_id))
+    session.delete(child)
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/children/{child_id}/devices", response_model=list[DeviceOut])

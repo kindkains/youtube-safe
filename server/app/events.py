@@ -2,6 +2,7 @@
 
 Push-Tags, auf die die Apps reagieren:
 - "sync"            Kind: Regeln/Einstellungen neu laden (ohne sichtbare Meldung)
+- "unpaired"        Kind: das Kind wurde gelöscht, die App meldet sich ab
 - "request:<id>"    Eltern: neue Anfrage (App baut daraus die Knöpfe Freigeben/Ablehnen)
 - "decision"        Kind: Entscheidung über eine Anfrage
 - "reward"          Kind: Belohnungsmodus gestartet/beendet
@@ -30,6 +31,10 @@ def sync_child(child: Child) -> None:
     notify.send_push(child.ntfy_topic, "sync", "sync", tags=("sync",), priority=1)
 
 
+def child_deleted(child: Child) -> None:
+    notify.send_push(child.ntfy_topic, "unpaired", "unpaired", tags=("unpaired",), priority=1)
+
+
 def sync_all_children(session: Session) -> None:
     for child in session.scalars(select(Child)):
         sync_child(child)
@@ -37,7 +42,10 @@ def sync_all_children(session: Session) -> None:
 
 def request_created(session: Session, request: ContentRequest, child: Child) -> None:
     label = KIND_LABEL[request.target_type]
-    title = f"{child.name} bittet um Freigabe"
+    if request.lifts_block:
+        title = f"{child.name} bittet um Aufhebung einer Sperre"
+    else:
+        title = f"{child.name} bittet um Freigabe"
     message = f"{label}: {request.title or request.target_id}"
     if request.channel_name and request.target_type == "video":
         message += f" ({request.channel_name})"

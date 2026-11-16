@@ -140,3 +140,70 @@ def test_kid_cannot_see_siblings_requests(client, parent_headers, child, kid_hea
     sibling_headers = pair_kid(client, parent_headers, sibling["id"])
     client.post(KID_REQ, headers=sibling_headers, json=video_request())
     assert client.get(KID_REQ, headers=kid_headers).json() == []
+
+
+# --- Aufhebung einer Sperre -------------------------------------------------------
+
+
+def block(client, parent_headers, child_id, target_type="video", target_id="vid1"):
+    response = client.post("/api/v1/parent/rules", headers=parent_headers,
+                           json={"child_id": child_id, "target_type": target_type,
+                                 "target_id": target_id, "effect": "block"})
+    assert response.status_code in (200, 201), response.text
+
+
+def test_request_for_blocked_video_asks_to_lift_block(client, parent_headers, child, kid_headers, pushes):
+    block(client, parent_headers, child["id"])
+    response = client.post(KID_REQ, headers=kid_headers, json=video_request(message="Ist nur Bio"))
+    assert response.status_code == 201
+    assert response.json()["lifts_block"] is True
+    parent_push = [p for p in pushes if any(t.startswith("request:") for t in p["tags"])]
+    assert parent_push[0]["title"] == "Mia bittet um Aufhebung einer Sperre"
+    assert "Ist nur Bio" in parent_push[0]["message"]
+
+
+def test_request_for_video_in_blocked_channel_asks_to_lift_block(client, parent_headers, child, kid_headers):
+    block(client, parent_headers, None, "channel", "UC1")
+    body = client.post(KID_REQ, headers=kid_headers, json=video_request()).json()
+    assert body["lifts_block"] is True
+
+
+def test_normal_request_does_not_lift_block(client, parent_headers, child, kid_headers, pushes):
+    body = client.post(KID_REQ, headers=kid_headers, json=video_request()).json()
+    assert body["lifts_block"] is False
+    assert any(p["title"] == "Mia bittet um Freigabe" for p in pushes)
+
+
+def test_lifts_block_is_kept_after_decision(client, parent_headers, child, kid_headers):
+    block(client, parent_headers, child["id"])
+    req = client.post(KID_REQ, headers=kid_headers, json=video_request()).json()
+    body = client.post(f"{PARENT_REQ}/{req['id']}/decision", headers=parent_headers,
+                       json={"action": "approve"}).json()
+    assert body["lifts_block"] is True
+
+
+def test_approve_replaces_block_of_same_scope(client, parent_headers, child, kid_headers):
+    block(client, parent_headers, child["id"])
+    req = client.post(KID_REQ, headers=kid_headers, json=video_request()).json()
+    client.post(f"{PARENT_REQ}/{req['id']}/decision", headers=parent_headers, json={"action": "approve"})
+    rules = client.get("/api/v1/kid/state", headers=kid_headers).json()["rules"]
+    assert [(r["target_id"], r["effect"]) for r in rules] == [("vid1", "allow")]
+
+
+def test_approve_for_all_removes_childs_own_block(client, parent_headers, child, kid_headers):
+    # Sonst schlägt die Sperre des Kindes die neue Freigabe für alle Kinder.
+    block(client, parent_headers, child["id"])
+    req = client.post(KID_REQ, headers=kid_headers, json=video_request()).json()
+    client.post(f"{PARENT_REQ}/{req['id']}/decision", headers=parent_headers,
+                json={"action": "approve", "scope": "all"})
+    rules = client.get("/api/v1/parent/rules", headers=parent_headers).json()
+    assert [(r["child_id"], r["target_id"], r["effect"]) for r in rules] == [(None, "vid1", "allow")]
+
+
+def test_approve_video_only_for_all_removes_childs_own_video_block(client, parent_headers, child, kid_headers):
+    block(client, parent_headers, child["id"])
+    req = client.post(KID_REQ, headers=kid_headers, json=channel_request()).json()
+    client.post(f"{PARENT_REQ}/{req['id']}/decision", headers=parent_headers,
+                json={"action": "approve_video_only", "scope": "all"})
+    rules = client.get("/api/v1/parent/rules", headers=parent_headers).json()
+    assert [(r["child_id"], r["target_id"], r["effect"]) for r in rules] == [(None, "vid1", "allow")]

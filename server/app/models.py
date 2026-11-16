@@ -135,6 +135,8 @@ class ContentRequest(Base):
     source_video_id: Mapped[str] = mapped_column(String(64), default="")
     source_video_title: Mapped[str] = mapped_column(String(300), default="")
     status: Mapped[str] = mapped_column(String(10), default=STATUS_OPEN, index=True)
+    # True, wenn beim Anfragen eine Sperre galt: das Kind bittet um Aufhebung.
+    lifts_block: Mapped[bool] = mapped_column(Boolean, default=False)
     decided_by: Mapped[int | None] = mapped_column(
         ForeignKey("parent.id", ondelete="SET NULL"), nullable=True
     )

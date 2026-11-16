@@ -195,6 +195,7 @@ class RequestOut(BaseModel):
     source_video_id: str
     source_video_title: str
     status: Status
+    lifts_block: bool
     decided_by_name: str | None
     decided_at: UtcOut | None
     reason: str
