@@ -15,7 +15,7 @@ Homelab-spezifisches (Hosts, Deployment, Fallstricke, offene Punkte) steht in `C
 |---|---|
 | `docs/superpowers/specs/2026-11-08-youtube-safe-design.md` | **Spec**: von Jessica abschnittsweise freigegeben, verbindlich |
 | `docs/superpowers/plans/2026-11-08-server.md` | **Plan 1 von 4 (Server)**: 17 Tasks, TDD — erledigt, deployt (15.11.2026) |
-| `docs/superpowers/plans/2026-11-15-android-core-parent.md` | **Plan 2 von 4 (Android `core` + Eltern-App)**: 25 Tasks, TDD — wartet auf Freigabe |
+| `docs/superpowers/plans/2026-11-15-android-core-parent.md` | **Plan 2 von 4 (Android `core` + Eltern-App)**: 25 Tasks, TDD — freigegeben 16.11., in Umsetzung |
 
 Pläne 3–4 sind noch zu schreiben (writing-plans-Skill), jeweils erst wenn der vorige umgesetzt ist:
 3. Kinder-App · 4. CI-Release-Pipeline (täglicher NewPipeExtractor-Check,

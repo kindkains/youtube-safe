@@ -23,7 +23,7 @@
 Beim Ausplanen nötig geworden; bitte beim Review mitprüfen:
 
 1. **Modulschnitt** `core` (JVM) / `core-android` / `parent`. `settings.gradle.kts` bindet die beiden Android-Module nur ein, wenn ein Android-SDK gefunden wird (`ANDROID_HOME` oder `sdk.dir` in `local.properties`). Damit läuft `./gradlew :core:test` auf dem Pi (arm64, kein `aapt2`), die Android-Module bauen auf dem Thinkbook und in GitHub Actions.
-2. **Paket- und App-Namen:** Paket `de.isoletta.safetube`, App-ID der Eltern-App `de.isoletta.safetube.parent` (Kinder-App in Plan 3: `de.isoletta.safetube.kid`), Anzeigename „SafeTube Eltern“. Vor einer Veröffentlichung umbenennen (Spec 1).
+2. **Paket- und App-Namen:** Paket `de.safetube`, App-ID der Eltern-App `de.safetube.parent` (Kinder-App in Plan 3: `de.safetube.kid`), Anzeigename „SafeTube Eltern“ (Jessica 16.11.: kein Personenname im Paket). Für den privaten Gebrauch reicht ein Platzhalter; vor einer Veröffentlichung kommt ohnehin ein neuer Name (Spec 1), dann mit einer Domain, die uns gehört, oder `io.github.<konto>.<app>`.
 3. **minSdk 31** (Android 12, Voraussetzung für das Self-Update in Plan 4), compile-/targetSdk 35. **Core-Library-Desugaring mit `desugar_jdk_libs_nio`** ist laut NewPipeExtractor unter API 33 Pflicht.
 4. **Versionen sind fest** und untereinander verträglich (alle im Dezember 2024 erschienen, Existenz am 15.11.2026 geprüft); einzig NewPipeExtractor ist aktuell (v0.27.1). Hochziehen gehört in Plan 4 (tägliche Prüfung).
 5. **Server-Adresse** ist im Login-Bildschirm änderbar, Standard `https://safetube.isoletta.me` (`BuildConfig.DEFAULT_SERVER`).
@@ -32,6 +32,8 @@ Beim Ausplanen nötig geworden; bitte beim Review mitprüfen:
 8. **15-Minuten-Abgleich** per WorkManager: offene Anfragen, zu denen noch keine Benachrichtigung kam, werden nachgemeldet (Liste der gemeldeten IDs, höchstens 500). Der Worker startet außerdem den Push-Dienst neu, falls Android ihn beendet hat.
 9. **Push-Aktionen:** [Freigeben] = `approve` mit Bereich „dieses Kind“ (Spec 7), [Ablehnen] = `reject` ohne Grund. Nachrichten mit Tag `decided:<id>` (anderes Elternteil hat entschieden) entfernen die offene Benachrichtigung zu dieser Anfrage.
 10. **„Ablehnen + Kanal sperren“:** Der Server sperrt bei `reject_and_block` genau das angefragte Ziel. Die App bietet deshalb: bei Kanal-Anfragen „Ablehnen + Kanal sperren“ (= `reject_and_block`); bei Video-Anfragen „Ablehnen + Video sperren“ (= `reject_and_block`) und „Ablehnen + Kanal sperren“ (= `reject` und danach Kanal-Regel `block`). Alle Entscheidungen gelten wahlweise für „dieses Kind“ oder „alle Kinder“.
+15. **Aufhebung einer Sperre** (Jessica 16.11.): Das Kind darf auch zu gesperrten Videos und Kanälen jederzeit anfragen, optional mit Begründung (die Kinder-UI kommt in Plan 3). Der Server merkt sich beim Anlegen `lifts_block` (galt eine Sperrregel?) und betitelt die Eltern-Meldung dann „… bittet um Aufhebung einer Sperre“. Die Eltern-App zeigt das in Liste und Detail als Hinweis. Eine Freigabe für „alle Kinder“ entfernt dabei eine Sperre nur für das anfragende Kind (sonst würde sie gewinnen). Server-Nachtrag: Commit `1ed2fc5`, Migration 0002.
+16. **Kind löschen** (Jessica 16.11.): `DELETE /parent/children/{id}` löscht Kind, Geräte, Kopplungscodes, eigene Regeln, Anfragen und Schauzeit; Regeln für alle Kinder bleiben. Das Kind bekommt Push `unpaired` (Kinder-App reagiert in Plan 3). In der Eltern-App unter Kind-Einstellungen mit Rückfrage, die den Namen nennt.
 11. **Vorschau-Player** (ungefiltert, Elternvorschau): bevorzugt den kombinierten Stream (Bild+Ton, meist 360p) — einfach und für eine Vorschau ausreichend; sonst Video-only + Audio zusammengeführt (bis 720p), sonst HLS. Robuste Wiedergabe über DASH-Manifeste (wie NewPipe) kommt mit dem Kinder-Player in Plan 3 und wird dann in `core-android` geteilt.
 12. **Kanal-IDs:** Regeln speichern immer die Kanal-ID `UC…` — dieselbe, die die Kinder-App aus den Streamdaten liest. Links mit `@handle`, `/c/…`, `/user/…` löst die App über den Extractor zur ID auf.
 13. **Tests:** `core` auf dem Pi (`./gradlew :core:test`); ViewModels, Robolectric- und Compose-Tests auf dem Thinkbook bzw. in CI (`./gradlew testDebugUnitTest`). **Emulator-UI-Tests (Spec 12) entfallen in Plan 2** zugunsten von Robolectric-Compose-Tests; ein Emulator-Lauf kann in Plan 4 dazukommen (der Thinkbook hat KVM). Live-Tests gegen YouTube nur mit `-Plive`.
@@ -50,7 +52,7 @@ android/
 ├── core/                          reines Kotlin/JVM
 │   ├── build.gradle.kts
 │   └── src/
-│       ├── main/kotlin/de/isoletta/safetube/core/
+│       ├── main/kotlin/de/safetube/core/
 │       │   ├── api/
 │       │   │   ├── InstantSerializer.kt   ISO-8601 mit „Z“
 │       │   │   ├── ApiJson.kt             gemeinsame Json-Konfiguration
@@ -74,7 +76,7 @@ android/
 │       │       ├── Mapping.kt             NewPipe-Typen → eigene Typen
 │       │       ├── StreamChoice.kt        welcher Stream für die Vorschau
 │       │       └── YouTubeSource.kt       Schnittstelle + NewPipeSource
-│       └── test/kotlin/de/isoletta/safetube/core/
+│       └── test/kotlin/de/safetube/core/
 │           ├── api/ModelsTest.kt, HttpTransportTest.kt, HttpParentApiTest.kt
 │           ├── gate/ContentGateTest.kt
 │           ├── youtube/YouTubeIdsTest.kt
@@ -82,23 +84,23 @@ android/
 │           ├── format/FormatsTest.kt, RewardDurationTest.kt
 │           ├── extractor/OkHttpDownloaderTest.kt, MappingTest.kt, StreamChoiceTest.kt
 │           └── live/LiveYouTubeTest.kt     nur mit -Plive
-├── core-android/                  Android-Bibliothek (Namespace de.isoletta.safetube.android)
+├── core-android/                  Android-Bibliothek (Namespace de.safetube.android)
 │   ├── build.gradle.kts
 │   └── src/
 │       ├── main/AndroidManifest.xml
-│       ├── main/kotlin/de/isoletta/safetube/android/
+│       ├── main/kotlin/de/safetube/android/
 │       │   ├── ui/Theme.kt
 │       │   ├── player/PreviewPlayer.kt     Media3, PlaybackSource → MediaSource
 │       │   ├── push/NtfyForegroundService.kt
 │       │   └── system/BatteryOptimization.kt
-│       └── test/kotlin/de/isoletta/safetube/android/system/BatteryOptimizationTest.kt
+│       └── test/kotlin/de/safetube/android/system/BatteryOptimizationTest.kt
 └── parent/                        Eltern-App
     ├── build.gradle.kts
     └── src/
         ├── main/AndroidManifest.xml
         ├── main/res/drawable/ic_launcher.xml, ic_notification.xml
         ├── main/res/values/strings.xml
-        ├── main/kotlin/de/isoletta/safetube/parent/
+        ├── main/kotlin/de/safetube/parent/
         │   ├── ParentApp.kt, AppContainer.kt, MainActivity.kt
         │   ├── session/SessionStore.kt, Auth.kt
         │   ├── nav/Routes.kt, ParentNavHost.kt
@@ -115,7 +117,7 @@ android/
         │   ├── parents/ParentsViewModel.kt, ParentsScreen.kt
         │   └── push/ParentNotifier.kt, ParentPushService.kt, DecisionReceiver.kt,
         │            BootReceiver.kt, OpenRequestsWorker.kt, PushControl.kt
-        └── test/kotlin/de/isoletta/safetube/parent/
+        └── test/kotlin/de/safetube/parent/
             ├── testing/FakeParentApi.kt, FakeYouTubeSource.kt, MainDispatcherRule.kt, Samples.kt
             ├── SmokeTest.kt
             ├── session/AuthTest.kt
@@ -407,19 +409,19 @@ git commit -m "Android: Gradle-Grundgerüst mit Versionskatalog und Modul core"
 ### Task 1: API-Modelle (`core`)
 
 **Files:**
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/api/InstantSerializer.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/api/ApiJson.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/api/Models.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/api/ModelsTest.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/api/InstantSerializer.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/api/ApiJson.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/api/Models.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/api/ModelsTest.kt`
 
 Die Feldnamen folgen 1:1 `server/app/schemas.py`. Snake-Case-Namen werden einzeln per `@SerialName` gesetzt (keine Naming-Strategy — die ist experimentell und würde auch Enum-Werte nicht sauber abdecken). `null` wird explizit mitgeschickt (wichtig für `child_id: null` = „alle Kinder“), Standardwerte ebenfalls.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/api/ModelsTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/api/ModelsTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.api
+package de.safetube.core.api
 
 import java.time.Instant
 import kotlinx.serialization.decodeFromString
@@ -438,7 +440,8 @@ class ModelsTest {
              "target_id": "UCabcdefghijklmnopqrstuv", "title": "Maus", "channel_id": "UCabcdefghijklmnopqrstuv",
              "channel_name": "Die Maus", "url": "https://www.youtube.com/channel/UCabcdefghijklmnopqrstuv",
              "thumbnail_url": "", "child_message": "bitte!", "source_video_id": "dQw4w9WgXcQ",
-             "source_video_title": "Folge 1", "status": "open", "decided_by_name": null, "decided_at": null,
+             "source_video_title": "Folge 1", "status": "open", "lifts_block": true,
+             "decided_by_name": null, "decided_at": null,
              "reason": "", "created_at": "2026-11-15T06:12:48.123456Z", "unbekannt": 1}
         """.trimIndent()
 
@@ -448,6 +451,7 @@ class ModelsTest {
         assertEquals(TargetType.CHANNEL, request.targetType)
         assertEquals(RequestStatus.OPEN, request.status)
         assertEquals("dQw4w9WgXcQ", request.sourceVideoId)
+        assertTrue(request.liftsBlock)
         assertNull(request.decidedAt)
         assertEquals(Instant.parse("2026-11-15T06:12:48.123456Z"), request.createdAt)
     }
@@ -525,15 +529,15 @@ class ModelsTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.api.ModelsTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.api.ModelsTest'`
 Expected: FAIL — Kompilierfehler `Unresolved reference: ApiJson` / `ContentRequest`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/api/InstantSerializer.kt`:
+`android/core/src/main/kotlin/de/safetube/core/api/InstantSerializer.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.api
+package de.safetube.core.api
 
 import java.time.Instant
 import kotlinx.serialization.KSerializer
@@ -553,10 +557,10 @@ object InstantSerializer : KSerializer<Instant> {
 }
 ```
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/api/ApiJson.kt`:
+`android/core/src/main/kotlin/de/safetube/core/api/ApiJson.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.api
+package de.safetube.core.api
 
 import kotlinx.serialization.json.Json
 
@@ -568,12 +572,12 @@ val ApiJson: Json = Json {
 }
 ```
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/api/Models.kt`:
+`android/core/src/main/kotlin/de/safetube/core/api/Models.kt`:
 
 ```kotlin
 @file:UseSerializers(InstantSerializer::class)
 
-package de.isoletta.safetube.core.api
+package de.safetube.core.api
 
 import java.time.Instant
 import kotlinx.serialization.SerialName
@@ -757,6 +761,8 @@ data class ContentRequest(
     @SerialName("decided_at") val decidedAt: Instant?,
     val reason: String,
     @SerialName("created_at") val createdAt: Instant,
+    /** Beim Anfragen galt eine Sperrregel: das Kind bittet um Aufhebung (Festlegung 15). */
+    @SerialName("lifts_block") val liftsBlock: Boolean = false,
 )
 
 @Serializable
@@ -826,7 +832,7 @@ data class Stats(
 
 - [ ] **Step 4: Test laufen lassen, grün sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.api.ModelsTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.api.ModelsTest'`
 Expected: PASS (7 Tests).
 
 - [ ] **Step 5: Commit**
@@ -841,21 +847,21 @@ git commit -m "core: API-Modelle passend zu server/app/schemas.py"
 ### Task 2: Entscheidungslogik `ContentGate` (`core`)
 
 **Files:**
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/gate/ContentGate.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/gate/ContentGateTest.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/gate/ContentGate.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/gate/ContentGateTest.kt`
 
 Port von `server/app/gate.py`, Gründe (`reason`) mit denselben Zeichenketten. Getestet wird ausschließlich gegen `shared/gate-cases.json`, damit Server und App nie auseinanderlaufen.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/gate/ContentGateTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/gate/ContentGateTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.gate
+package de.safetube.core.gate
 
-import de.isoletta.safetube.core.api.ApiJson
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.TargetType
+import de.safetube.core.api.ApiJson
+import de.safetube.core.api.Effect
+import de.safetube.core.api.TargetType
 import java.io.File
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.intOrNull
@@ -908,18 +914,18 @@ class ContentGateTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.gate.ContentGateTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.gate.ContentGateTest'`
 Expected: FAIL — `Unresolved reference: RuleView` / `ContentGate`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/gate/ContentGate.kt`:
+`android/core/src/main/kotlin/de/safetube/core/gate/ContentGate.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.gate
+package de.safetube.core.gate
 
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.TargetType
+import de.safetube.core.api.Effect
+import de.safetube.core.api.TargetType
 
 /** Eine Regel, reduziert auf das, was die Entscheidung braucht. childId = null: gilt für alle Kinder. */
 data class RuleView(
@@ -996,7 +1002,7 @@ object ContentGate {
 
 - [ ] **Step 4: Test laufen lassen, grün sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.gate.ContentGateTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.gate.ContentGateTest'`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -1011,17 +1017,17 @@ git commit -m "core: ContentGate, getestet gegen shared/gate-cases.json"
 ### Task 3: YouTube-Links erkennen (`core`)
 
 **Files:**
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/youtube/YouTubeIds.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/youtube/YouTubeIdsTest.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/youtube/YouTubeIds.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/youtube/YouTubeIdsTest.kt`
 
 Wird gebraucht für „neue Regel per eingefügtem Link“ und um aus Extractor-URLs Video- und Kanal-IDs zu lesen. Eine nackte 11-Zeichen-Video-ID wird bewusst **nicht** erkannt (zu leicht mit Wörtern zu verwechseln), eine nackte Kanal-ID `UC…` schon.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/youtube/YouTubeIdsTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/youtube/YouTubeIdsTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.youtube
+package de.safetube.core.youtube
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -1093,15 +1099,15 @@ class YouTubeIdsTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.youtube.YouTubeIdsTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.youtube.YouTubeIdsTest'`
 Expected: FAIL — `Unresolved reference: YouTubeLink`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/youtube/YouTubeIds.kt`:
+`android/core/src/main/kotlin/de/safetube/core/youtube/YouTubeIds.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.youtube
+package de.safetube.core.youtube
 
 import java.net.URI
 import java.net.URISyntaxException
@@ -1179,7 +1185,7 @@ object YouTubeIds {
 
 - [ ] **Step 4: Test laufen lassen, grün sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.youtube.YouTubeIdsTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.youtube.YouTubeIdsTest'`
 Expected: PASS (5 Tests).
 
 - [ ] **Step 5: Commit**
@@ -1194,18 +1200,18 @@ git commit -m "core: YouTube-Links in Video- und Kanal-IDs zerlegen"
 ### Task 4: HTTP-Transport und Fehler (`core`)
 
 **Files:**
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/api/Errors.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/api/HttpTransport.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/api/HttpTransportTest.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/api/Errors.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/api/HttpTransport.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/api/HttpTransportTest.kt`
 
 FastAPI liefert Fehler als `{"detail": "Text"}`, Validierungsfehler als `{"detail": [{"msg": …}, …]}`. Beides wird zu `ApiException(status, detail)`. Netzwerkfehler bleiben `IOException`. Server-Adresse und Token kommen über Funktionen herein, damit ein Login die Adresse wechseln kann, ohne den Transport neu zu bauen.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/api/HttpTransportTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/api/HttpTransportTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.api
+package de.safetube.core.api
 
 import java.io.IOException
 import kotlinx.coroutines.runBlocking
@@ -1347,15 +1353,15 @@ class HttpTransportTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.api.HttpTransportTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.api.HttpTransportTest'`
 Expected: FAIL — `Unresolved reference: HttpTransport`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/api/Errors.kt`:
+`android/core/src/main/kotlin/de/safetube/core/api/Errors.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.api
+package de.safetube.core.api
 
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -1387,10 +1393,10 @@ fun Throwable.userMessage(): String = when (this) {
 
 Hinweis: Für 401 liefert `userMessage()` bewusst den Hinweis zum Neuanmelden. Der Test `Fehlertext aus detail` prüft `error.detail`, nicht `userMessage()`; `attempt fängt Fehler` nutzt Status 404.
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/api/HttpTransport.kt`:
+`android/core/src/main/kotlin/de/safetube/core/api/HttpTransport.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.api
+package de.safetube.core.api
 
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -1484,7 +1490,7 @@ class HttpTransport(
 
 - [ ] **Step 4: Test laufen lassen, grün sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.api.HttpTransportTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.api.HttpTransportTest'`
 Expected: PASS (9 Tests).
 
 - [ ] **Step 5: Commit**
@@ -1499,8 +1505,8 @@ git commit -m "core: HTTP-Transport mit Bearer-Token und FastAPI-Fehlerabbildung
 ### Task 5: Eltern-API (`core`)
 
 **Files:**
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/api/ParentApi.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/api/HttpParentApiTest.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/api/ParentApi.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/api/HttpParentApiTest.kt`
 
 Alle Eltern-Endpunkte aus `server/app/routers/parent_*.py`. Die Schnittstelle `ParentApi` erlaubt den ViewModels Fakes in Tests.
 
@@ -1509,7 +1515,7 @@ Alle Eltern-Endpunkte aus `server/app/routers/parent_*.py`. Die Schnittstelle `P
 | login / logout / me | `POST /parent/login`, `POST /parent/logout` (204), `GET /parent/me` |
 | updateMe / pushInfo | `PATCH /parent/me`, `GET /parent/push` |
 | parents / createParent | `GET /parent/parents`, `POST /parent/parents` |
-| children / createChild / updateChild | `GET /parent/children`, `POST /parent/children`, `PATCH /parent/children/{id}` |
+| children / createChild / updateChild / deleteChild | `GET /parent/children`, `POST /parent/children`, `PATCH /parent/children/{id}`, `DELETE /parent/children/{id}` (204) |
 | devices / unpairDevice / pairingCode | `GET /parent/children/{id}/devices`, `DELETE /parent/devices/{id}` (204), `POST /parent/children/{id}/pairing-code` |
 | rules / createRule / updateRule / deleteRule | `GET /parent/rules?child_id=&global_only=`, `POST`, `PATCH /{id}`, `DELETE /{id}` (204) |
 | requests / request / decide | `GET /parent/requests?child_id&status&since&until&limit`, `GET /{id}`, `POST /{id}/decision` |
@@ -1518,10 +1524,10 @@ Alle Eltern-Endpunkte aus `server/app/routers/parent_*.py`. Die Schnittstelle `P
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/api/HttpParentApiTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/api/HttpParentApiTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.api
+package de.safetube.core.api
 
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
@@ -1688,6 +1694,7 @@ class HttpParentApiTest {
             "last_seen": "2026-11-15T07:00:00Z", "unpaired_at": null}]""")
         reply("", 204)
         reply("""{"code": "AB12CD34", "expires_at": "2026-11-15T06:10:00Z", "qr_payload": "{}"}""")
+        reply("", 204)
 
         api.children()
         api.createChild("Antonio")
@@ -1695,6 +1702,7 @@ class HttpParentApiTest {
         val devices = api.devices(1)
         api.unpairDevice(4)
         val code = api.pairingCode(1)
+        api.deleteChild(1)
 
         assertEquals("/api/v1/parent/children", server.takeRequest().path)
         assertEquals("""{"name":"Antonio"}""", server.takeRequest().body.readUtf8())
@@ -1704,6 +1712,9 @@ class HttpParentApiTest {
         val pairing = server.takeRequest()
         assertEquals("POST", pairing.method)
         assertEquals("/api/v1/parent/children/1/pairing-code", pairing.path)
+        val deletion = server.takeRequest()
+        assertEquals("DELETE", deletion.method)
+        assertEquals("/api/v1/parent/children/1", deletion.path)
         assertEquals("0.1.0", devices.single().appVersion)
         assertEquals("AB12CD34", code.code)
     }
@@ -1736,15 +1747,15 @@ class HttpParentApiTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.api.HttpParentApiTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.api.HttpParentApiTest'`
 Expected: FAIL — `Unresolved reference: HttpParentApi`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/api/ParentApi.kt`:
+`android/core/src/main/kotlin/de/safetube/core/api/ParentApi.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.api
+package de.safetube.core.api
 
 import java.time.Instant
 
@@ -1761,6 +1772,8 @@ interface ParentApi {
     suspend fun children(): List<Child>
     suspend fun createChild(name: String): Child
     suspend fun updateChild(childId: Int, update: ChildUpdate): Child
+    /** Löscht das Kind samt Geräten, eigenen Regeln, Anfragen und Schauzeit (Festlegung 16). */
+    suspend fun deleteChild(childId: Int)
     suspend fun devices(childId: Int): List<Device>
     suspend fun unpairDevice(deviceId: Int)
     suspend fun pairingCode(childId: Int): PairingCode
@@ -1805,6 +1818,8 @@ class HttpParentApi(private val http: HttpTransport) : ParentApi {
 
     override suspend fun updateChild(childId: Int, update: ChildUpdate): Child =
         http.patch("/parent/children/$childId", update)
+
+    override suspend fun deleteChild(childId: Int) = http.send("DELETE", "/parent/children/$childId")
 
     override suspend fun devices(childId: Int): List<Device> = http.get("/parent/children/$childId/devices")
 
@@ -1865,7 +1880,7 @@ Hinweis zu den Abfrageparametern: `mapOf` behält die Einfügereihenfolge, `addQ
 
 - [ ] **Step 4: Test laufen lassen, grün sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.api.HttpParentApiTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.api.HttpParentApiTest'`
 Expected: PASS (10 Tests).
 
 - [ ] **Step 5: Commit**
@@ -1880,19 +1895,19 @@ git commit -m "core: Eltern-API mit allen Endpunkten des Servers"
 ### Task 6: ntfy-Datenstrom (`core`)
 
 **Files:**
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/push/Ntfy.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/push/NtfyStream.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/push/NtfyParserTest.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/push/NtfyStreamTest.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/push/Ntfy.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/push/NtfyStream.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/push/NtfyParserTest.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/push/NtfyStreamTest.kt`
 
 ntfy liefert unter `GET <server>/<topic>/json` eine Zeile JSON pro Ereignis (`open`, `keepalive` alle 45 s, `message`). `NtfyStream.signals()` hält die Verbindung, meldet `Connected`/`Disconnected`/`Message`, verbindet nach Fehlern mit wachsender Pause neu (1 s, 2 s, 4 s … höchstens 60 s) und setzt dabei `since=<letzte Nachrichten-ID>`, damit nichts verloren geht. Das Lese-Timeout (90 s) liegt über dem Keepalive-Abstand und erkennt so tote Verbindungen.
 
 - [ ] **Step 1: Failing tests schreiben**
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/push/NtfyParserTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/push/NtfyParserTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.push
+package de.safetube.core.push
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -1932,10 +1947,10 @@ class NtfyParserTest {
 }
 ```
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/push/NtfyStreamTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/push/NtfyStreamTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.push
+package de.safetube.core.push
 
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -2024,17 +2039,17 @@ class NtfyStreamTest {
 
 - [ ] **Step 2: Tests laufen lassen, Scheitern sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.push.Ntfy*'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.push.Ntfy*'`
 Expected: FAIL — `Unresolved reference: NtfyParser` / `NtfyStream`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/push/Ntfy.kt`:
+`android/core/src/main/kotlin/de/safetube/core/push/Ntfy.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.push
+package de.safetube.core.push
 
-import de.isoletta.safetube.core.api.ApiJson
+import de.safetube.core.api.ApiJson
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -2067,10 +2082,10 @@ object NtfyParser {
 }
 ```
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/push/NtfyStream.kt`:
+`android/core/src/main/kotlin/de/safetube/core/push/NtfyStream.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.push
+package de.safetube.core.push
 
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -2160,7 +2175,7 @@ class NtfyStream(
 
 - [ ] **Step 4: Tests laufen lassen, grün sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.push.Ntfy*'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.push.Ntfy*'`
 Expected: PASS (7 Tests).
 
 - [ ] **Step 5: Commit**
@@ -2175,19 +2190,19 @@ git commit -m "core: ntfy-Datenstrom mit Neuverbinden und since"
 ### Task 7: Eltern-Push auswerten, gemeldete Anfragen merken (`core`)
 
 **Files:**
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/push/ParentPush.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/push/SeenIds.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/push/ParentPushTest.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/push/SeenIdsTest.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/push/ParentPush.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/push/SeenIds.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/push/ParentPushTest.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/push/SeenIdsTest.kt`
 
 Tags laut `server/app/events.py`: `request:<id>` (neue Anfrage), `info` + `decided:<id>` (anderes Elternteil hat entschieden), `info` (Belohnung abgelaufen, neues Gerät), `alert` (Gerät meldet sich nicht, Störung). `OpenRequestCheck` baut für den 15-Minuten-Abgleich Benachrichtigungen im selben Wortlaut wie der Server.
 
 - [ ] **Step 1: Failing tests schreiben**
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/push/ParentPushTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/push/ParentPushTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.push
+package de.safetube.core.push
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -2224,14 +2239,14 @@ class ParentPushTest {
 }
 ```
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/push/SeenIdsTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/push/SeenIdsTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.push
+package de.safetube.core.push
 
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.api.TargetType
+import de.safetube.core.api.ContentRequest
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.api.TargetType
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -2297,15 +2312,15 @@ class SeenIdsTest {
 
 - [ ] **Step 2: Tests laufen lassen, Scheitern sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.push.ParentPushTest' --tests 'de.isoletta.safetube.core.push.SeenIdsTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.push.ParentPushTest' --tests 'de.safetube.core.push.SeenIdsTest'`
 Expected: FAIL — `Unresolved reference: ParentPush` / `SeenIds`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/push/ParentPush.kt`:
+`android/core/src/main/kotlin/de/safetube/core/push/ParentPush.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.push
+package de.safetube.core.push
 
 /** Was eine Push-Nachricht für die Eltern-App bedeutet. */
 sealed interface ParentPush {
@@ -2338,13 +2353,13 @@ sealed interface ParentPush {
 }
 ```
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/push/SeenIds.kt`:
+`android/core/src/main/kotlin/de/safetube/core/push/SeenIds.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.push
+package de.safetube.core.push
 
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.core.api.TargetType
+import de.safetube.core.api.ContentRequest
+import de.safetube.core.api.TargetType
 
 /** IDs bereits gemeldeter Anfragen, begrenzt auf die neuesten [capacity]. */
 class SeenIds(private val capacity: Int = 500, initial: Collection<Int> = emptyList()) {
@@ -2395,7 +2410,7 @@ object OpenRequestCheck {
 
 - [ ] **Step 4: Tests laufen lassen, grün sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.push.ParentPushTest' --tests 'de.isoletta.safetube.core.push.SeenIdsTest'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.push.ParentPushTest' --tests 'de.safetube.core.push.SeenIdsTest'`
 Expected: PASS (9 Tests).
 
 - [ ] **Step 5: Commit**
@@ -2410,19 +2425,19 @@ git commit -m "core: Eltern-Push auswerten, gemeldete Anfragen merken"
 ### Task 8: Anzeigeformate und Belohnungsdauer (`core`)
 
 **Files:**
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/format/Formats.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/format/RewardDuration.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/format/FormatsTest.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/format/RewardDurationTest.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/format/Formats.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/format/RewardDuration.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/format/FormatsTest.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/format/RewardDurationTest.kt`
 
 Alle Zeiten werden in `Europe/Berlin` angezeigt (wie die Statistik-Tage des Servers). Wochentage aus einer festen Liste statt `DayOfWeek.getDisplayName` — dessen Ausgabe („Mo“ oder „Mo.“) hängt von JDK und Android-Version ab. Die Obergrenze von 30 Tagen entspricht `MAX_REWARD_MINUTES` in `server/app/schemas.py`.
 
 - [ ] **Step 1: Failing tests schreiben**
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/format/FormatsTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/format/FormatsTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.format
+package de.safetube.core.format
 
 import java.time.Instant
 import org.junit.Assert.assertEquals
@@ -2468,10 +2483,10 @@ class FormatsTest {
 }
 ```
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/format/RewardDurationTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/format/RewardDurationTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.format
+package de.safetube.core.format
 
 import java.time.Instant
 import java.time.LocalDate
@@ -2517,15 +2532,15 @@ class RewardDurationTest {
 
 - [ ] **Step 2: Tests laufen lassen, Scheitern sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.format.*'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.format.*'`
 Expected: FAIL — `Unresolved reference: Formats` / `RewardDuration`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/format/Formats.kt`:
+`android/core/src/main/kotlin/de/safetube/core/format/Formats.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.format
+package de.safetube.core.format
 
 import java.time.Duration
 import java.time.Instant
@@ -2574,10 +2589,10 @@ object Formats {
 }
 ```
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/format/RewardDuration.kt`:
+`android/core/src/main/kotlin/de/safetube/core/format/RewardDuration.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.format
+package de.safetube.core.format
 
 import java.time.Duration
 import java.time.Instant
@@ -2608,7 +2623,7 @@ object RewardDuration {
 
 - [ ] **Step 4: Tests laufen lassen, grün sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.format.*'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.format.*'`
 Expected: PASS (8 Tests).
 
 - [ ] **Step 5: Commit**
@@ -2623,15 +2638,15 @@ git commit -m "core: Anzeigeformate und Prüfung der Belohnungsdauer"
 ### Task 9: YouTube über NewPipeExtractor (`core`)
 
 **Files:**
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/OkHttpDownloader.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/YouTubeModels.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/Mapping.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/StreamChoice.kt`
-- Create: `android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/YouTubeSource.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/extractor/OkHttpDownloaderTest.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/extractor/MappingTest.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/extractor/StreamChoiceTest.kt`
-- Test: `android/core/src/test/kotlin/de/isoletta/safetube/core/live/LiveYouTubeTest.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/extractor/OkHttpDownloader.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/extractor/YouTubeModels.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/extractor/Mapping.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/extractor/StreamChoice.kt`
+- Create: `android/core/src/main/kotlin/de/safetube/core/extractor/YouTubeSource.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/extractor/OkHttpDownloaderTest.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/extractor/MappingTest.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/extractor/StreamChoiceTest.kt`
+- Test: `android/core/src/test/kotlin/de/safetube/core/live/LiveYouTubeTest.kt`
 
 NewPipe-Klassen bleiben hinter eigenen Typen (`VideoItem`, `ChannelPage`, `StreamDetails`, `PlaybackSource`). Der Rest der App kennt NewPipeExtractor nicht — ein Versionswechsel betrifft nur dieses Paket. Kanal-IDs werden aus den Uploader-URLs gelesen (`/channel/UC…`, siehe Festlegung 12). Fehler werden zu `YouTubeException` mit fertigem deutschem Text.
 
@@ -2639,10 +2654,10 @@ Verwendete NewPipe-Schnittstellen (geprüft gegen v0.27.1): `Downloader.execute(
 
 - [ ] **Step 1: Failing tests schreiben**
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/extractor/OkHttpDownloaderTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/extractor/OkHttpDownloaderTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.extractor
+package de.safetube.core.extractor
 
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -2716,10 +2731,10 @@ class OkHttpDownloaderTest {
 }
 ```
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/extractor/MappingTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/extractor/MappingTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.extractor
+package de.safetube.core.extractor
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -2845,10 +2860,10 @@ class MappingTest {
 }
 ```
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/extractor/StreamChoiceTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/extractor/StreamChoiceTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.extractor
+package de.safetube.core.extractor
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -2891,16 +2906,16 @@ class StreamChoiceTest {
 }
 ```
 
-`android/core/src/test/kotlin/de/isoletta/safetube/core/live/LiveYouTubeTest.kt`:
+`android/core/src/test/kotlin/de/safetube/core/live/LiveYouTubeTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.live
+package de.safetube.core.live
 
-import de.isoletta.safetube.core.extractor.NewPipeSource
-import de.isoletta.safetube.core.extractor.OkHttpDownloader
-import de.isoletta.safetube.core.extractor.SearchFilter
-import de.isoletta.safetube.core.extractor.SearchHit
-import de.isoletta.safetube.core.extractor.StreamChoice
+import de.safetube.core.extractor.NewPipeSource
+import de.safetube.core.extractor.OkHttpDownloader
+import de.safetube.core.extractor.SearchFilter
+import de.safetube.core.extractor.SearchHit
+import de.safetube.core.extractor.StreamChoice
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
@@ -2944,15 +2959,15 @@ class LiveYouTubeTest {
 
 - [ ] **Step 2: Tests laufen lassen, Scheitern sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.extractor.*'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.extractor.*'`
 Expected: FAIL — `Unresolved reference: OkHttpDownloader` / `Mapping` / `StreamChoice`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/OkHttpDownloader.kt`:
+`android/core/src/main/kotlin/de/safetube/core/extractor/OkHttpDownloader.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.extractor
+package de.safetube.core.extractor
 
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -3000,10 +3015,10 @@ class OkHttpDownloader(private val client: OkHttpClient) : Downloader() {
 }
 ```
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/YouTubeModels.kt`:
+`android/core/src/main/kotlin/de/safetube/core/extractor/YouTubeModels.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.extractor
+package de.safetube.core.extractor
 
 data class VideoItem(
     val videoId: String,
@@ -3073,12 +3088,12 @@ enum class SearchFilter(val contentFilters: List<String>) {
 }
 ```
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/Mapping.kt`:
+`android/core/src/main/kotlin/de/safetube/core/extractor/Mapping.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.extractor
+package de.safetube.core.extractor
 
-import de.isoletta.safetube.core.youtube.YouTubeIds
+import de.safetube.core.youtube.YouTubeIds
 import org.schabi.newpipe.extractor.Image
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.extractor.stream.AudioStream
@@ -3152,10 +3167,10 @@ internal object Mapping {
 }
 ```
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/StreamChoice.kt`:
+`android/core/src/main/kotlin/de/safetube/core/extractor/StreamChoice.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.extractor
+package de.safetube.core.extractor
 
 /**
  * Welche Streams spielt die Vorschau? (Festlegung 11 im Plan)
@@ -3185,13 +3200,13 @@ object StreamChoice {
 }
 ```
 
-`android/core/src/main/kotlin/de/isoletta/safetube/core/extractor/YouTubeSource.kt`:
+`android/core/src/main/kotlin/de/safetube/core/extractor/YouTubeSource.kt`:
 
 ```kotlin
-package de.isoletta.safetube.core.extractor
+package de.safetube.core.extractor
 
-import de.isoletta.safetube.core.api.YouTubeException
-import de.isoletta.safetube.core.youtube.YouTubeIds
+import de.safetube.core.api.YouTubeException
+import de.safetube.core.youtube.YouTubeIds
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -3298,12 +3313,12 @@ class NewPipeSource(downloader: Downloader) : YouTubeSource {
 
 - [ ] **Step 4: Tests laufen lassen, grün sehen**
 
-Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.isoletta.safetube.core.extractor.*'`
+Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.extractor.*'`
 Expected: PASS (14 Tests). Der Live-Test ist ausgeschlossen.
 
 - [ ] **Step 5: Live-Test einmal von Hand**
 
-Run: `cd android && ./gradlew --console=plain :core:test -Plive --tests 'de.isoletta.safetube.core.live.*'`
+Run: `cd android && ./gradlew --console=plain :core:test -Plive --tests 'de.safetube.core.live.*'`
 Expected: PASS (3 Tests). Scheitert er mit `YouTubeException`, die Ursache (`--info`, Stacktrace) ansehen: Netz, reCAPTCHA (dann später erneut) oder eine Änderung bei YouTube, die eine neuere NewPipeExtractor-Version braucht. Der Live-Test blockiert den Plan nicht, sein Ergebnis gehört aber in den Zwischenstand an Jessica.
 
 - [ ] **Step 6: Gesamte `core`-Suite und Commit**
@@ -3322,26 +3337,26 @@ git commit -m "core: YouTube über NewPipeExtractor hinter eigenen Typen"
 
 **Files:**
 - Create: `android/core-android/build.gradle.kts`, `android/core-android/src/main/AndroidManifest.xml`
-- Create: `android/core-android/src/main/kotlin/de/isoletta/safetube/android/ui/Theme.kt`
+- Create: `android/core-android/src/main/kotlin/de/safetube/android/ui/Theme.kt`
 - Create: `android/parent/build.gradle.kts`, `android/parent/src/main/AndroidManifest.xml`
 - Create: `android/parent/src/main/res/values/strings.xml`, `android/parent/src/main/res/drawable/ic_launcher.xml`, `android/parent/src/main/res/drawable/ic_notification.xml`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/ParentApp.kt`, `.../parent/MainActivity.kt`
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/SmokeTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/ParentApp.kt`, `.../parent/MainActivity.kt`
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/SmokeTest.kt`
 
 Ab hier wird auf dem Thinkbook gebaut (`android/tools/remote-build.sh …`, Festlegung 14). Der erste Lauf lädt Android-Plattform 35, Build-Tools und alle Bibliotheken und dauert entsprechend.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/SmokeTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/SmokeTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent
+package de.safetube.parent
 
 import androidx.compose.material3.Text
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import de.isoletta.safetube.android.ui.SafeTubeTheme
+import de.safetube.android.ui.SafeTubeTheme
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -3379,7 +3394,7 @@ plugins {
 }
 
 android {
-    namespace = "de.isoletta.safetube.android"
+    namespace = "de.safetube.android"
     compileSdk = 35
 
     defaultConfig {
@@ -3433,10 +3448,10 @@ dependencies {
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" />
 ```
 
-`android/core-android/src/main/kotlin/de/isoletta/safetube/android/ui/Theme.kt`:
+`android/core-android/src/main/kotlin/de/safetube/android/ui/Theme.kt`:
 
 ```kotlin
-package de.isoletta.safetube.android.ui
+package de.safetube.android.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -3464,11 +3479,11 @@ plugins {
 }
 
 android {
-    namespace = "de.isoletta.safetube.parent"
+    namespace = "de.safetube.parent"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "de.isoletta.safetube.parent"
+        applicationId = "de.safetube.parent"
         minSdk = 31
         targetSdk = 35
         versionCode = 1
@@ -3606,20 +3621,20 @@ dependencies {
 </vector>
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/ParentApp.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/ParentApp.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent
+package de.safetube.parent
 
 import android.app.Application
 
 class ParentApp : Application()
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/MainActivity.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/MainActivity.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent
+package de.safetube.parent
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -3627,7 +3642,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import de.isoletta.safetube.android.ui.SafeTubeTheme
+import de.safetube.android.ui.SafeTubeTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -3659,38 +3674,38 @@ git commit -m "Android: Module core-android und parent mit Theme und Robolectric
 ### Task 11: Sitzung, Anmeldung und Test-Hilfen (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/session/SessionStore.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/session/Auth.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/AppContainer.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/ParentApp.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/login/LoginViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/login/LoginScreen.kt`
-- Create (Test-Hilfen): `android/parent/src/test/kotlin/de/isoletta/safetube/parent/testing/Samples.kt`, `FakeParentApi.kt`, `MainDispatcherRule.kt`, `TestStores.kt`
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/session/AuthTest.kt`
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/login/LoginViewModelTest.kt`
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/login/LoginScreenTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/session/SessionStore.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/session/Auth.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/AppContainer.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/ParentApp.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/login/LoginViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/login/LoginScreen.kt`
+- Create (Test-Hilfen): `android/parent/src/test/kotlin/de/safetube/parent/testing/Samples.kt`, `FakeParentApi.kt`, `MainDispatcherRule.kt`, `TestStores.kt`
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/session/AuthTest.kt`
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/login/LoginViewModelTest.kt`
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/login/LoginScreenTest.kt`
 
 Nach dem Login holt die App sofort `/parent/push` (eigenes ntfy-Topic) und speichert alles zusammen. Abmelden löscht die Sitzung, behält aber die Server-Adresse als Vorschlag.
 
 - [ ] **Step 1: Test-Hilfen anlegen** (werden von allen folgenden ViewModel-Tests benutzt)
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/testing/Samples.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/testing/Samples.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.testing
+package de.safetube.parent.testing
 
-import de.isoletta.safetube.core.api.Child
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.core.api.DayStat
-import de.isoletta.safetube.core.api.Device
-import de.isoletta.safetube.core.api.DisplayMode
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.HistoryEntry
-import de.isoletta.safetube.core.api.Parent
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.api.Rule
-import de.isoletta.safetube.core.api.Stats
-import de.isoletta.safetube.core.api.TargetType
+import de.safetube.core.api.Child
+import de.safetube.core.api.ContentRequest
+import de.safetube.core.api.DayStat
+import de.safetube.core.api.Device
+import de.safetube.core.api.DisplayMode
+import de.safetube.core.api.Effect
+import de.safetube.core.api.HistoryEntry
+import de.safetube.core.api.Parent
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.api.Rule
+import de.safetube.core.api.Stats
+import de.safetube.core.api.TargetType
 import java.time.Instant
 
 /** Beispieldaten für Tests. Zeitpunkt „jetzt“ ist fest. */
@@ -3716,6 +3731,8 @@ object Samples {
         status: RequestStatus = RequestStatus.OPEN,
         createdAt: Instant = NOW.minusSeconds(60L * id),
         sourceVideoId: String = "",
+        liftsBlock: Boolean = false,
+        childMessage: String = "",
     ) = ContentRequest(
         id = id,
         childId = childId,
@@ -3727,7 +3744,7 @@ object Samples {
         channelName = "Kanal $id",
         url = "https://www.youtube.com/watch?v=vid$id",
         thumbnailUrl = "",
-        childMessage = "",
+        childMessage = childMessage,
         sourceVideoId = sourceVideoId,
         sourceVideoTitle = if (sourceVideoId.isEmpty()) "" else "Ursprungsvideo",
         status = status,
@@ -3735,6 +3752,7 @@ object Samples {
         decidedAt = null,
         reason = "",
         createdAt = createdAt,
+        liftsBlock = liftsBlock,
     )
 
     fun rule(
@@ -3773,32 +3791,32 @@ object Samples {
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/testing/FakeParentApi.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/testing/FakeParentApi.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.testing
+package de.safetube.parent.testing
 
-import de.isoletta.safetube.core.api.Child
-import de.isoletta.safetube.core.api.ChildUpdate
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.core.api.Decision
-import de.isoletta.safetube.core.api.DecisionAction
-import de.isoletta.safetube.core.api.Device
-import de.isoletta.safetube.core.api.HistoryEntry
-import de.isoletta.safetube.core.api.LoginResponse
-import de.isoletta.safetube.core.api.MeUpdate
-import de.isoletta.safetube.core.api.PairingCode
-import de.isoletta.safetube.core.api.Parent
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.ParentCreate
-import de.isoletta.safetube.core.api.PushInfo
-import de.isoletta.safetube.core.api.RequestFilter
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.api.RewardStart
-import de.isoletta.safetube.core.api.Rule
-import de.isoletta.safetube.core.api.RuleCreate
-import de.isoletta.safetube.core.api.RuleUpdate
-import de.isoletta.safetube.core.api.Stats
+import de.safetube.core.api.Child
+import de.safetube.core.api.ChildUpdate
+import de.safetube.core.api.ContentRequest
+import de.safetube.core.api.Decision
+import de.safetube.core.api.DecisionAction
+import de.safetube.core.api.Device
+import de.safetube.core.api.HistoryEntry
+import de.safetube.core.api.LoginResponse
+import de.safetube.core.api.MeUpdate
+import de.safetube.core.api.PairingCode
+import de.safetube.core.api.Parent
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.ParentCreate
+import de.safetube.core.api.PushInfo
+import de.safetube.core.api.RequestFilter
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.api.RewardStart
+import de.safetube.core.api.Rule
+import de.safetube.core.api.RuleCreate
+import de.safetube.core.api.RuleUpdate
+import de.safetube.core.api.Stats
 import java.time.Instant
 
 /** Server im Speicher. [calls] protokolliert jeden Aufruf; [failure] wird beim nächsten Aufruf geworfen. */
@@ -3895,6 +3913,12 @@ class FakeParentApi : ParentApi {
                 shortsEnabled = update.shortsEnabled ?: it.shortsEnabled,
             )
         }
+    }
+
+    override suspend fun deleteChild(childId: Int) {
+        record("deleteChild $childId")
+        childrenList.removeAll { it.id == childId }
+        devicesByChild.remove(childId)
     }
 
     override suspend fun devices(childId: Int): List<Device> {
@@ -4011,10 +4035,10 @@ class FakeParentApi : ParentApi {
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/testing/MainDispatcherRule.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/testing/MainDispatcherRule.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.testing
+package de.safetube.parent.testing
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -4034,13 +4058,13 @@ class MainDispatcherRule(val dispatcher: TestDispatcher = UnconfinedTestDispatch
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/testing/TestStores.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/testing/TestStores.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.testing
+package de.safetube.parent.testing
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
-import de.isoletta.safetube.parent.session.SessionStore
+import de.safetube.parent.session.SessionStore
 import org.junit.rules.TemporaryFolder
 
 /** SessionStore auf einer Datei im Test-Verzeichnis (eine pro Test, DataStore erlaubt nur eine Instanz pro Datei). */
@@ -4050,16 +4074,16 @@ fun TemporaryFolder.sessionStore(): SessionStore =
 
 - [ ] **Step 2: Failing tests schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/session/AuthTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/session/AuthTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.session
+package de.safetube.parent.session
 
-import de.isoletta.safetube.core.api.ApiException
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.Samples
-import de.isoletta.safetube.parent.testing.sessionStore
+import de.safetube.core.api.ApiException
+import de.safetube.core.api.ContentRequest
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.Samples
+import de.safetube.parent.testing.sessionStore
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -4155,16 +4179,16 @@ class AuthTest {
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/login/LoginViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/login/LoginViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.login
+package de.safetube.parent.login
 
-import de.isoletta.safetube.core.api.ApiException
-import de.isoletta.safetube.parent.session.Auth
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.sessionStore
+import de.safetube.core.api.ApiException
+import de.safetube.parent.session.Auth
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.sessionStore
 import java.io.IOException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -4241,10 +4265,10 @@ class LoginViewModelTest {
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/login/LoginScreenTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/login/LoginScreenTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.login
+package de.safetube.parent.login
 
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -4252,7 +4276,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import de.isoletta.safetube.android.ui.SafeTubeTheme
+import de.safetube.android.ui.SafeTubeTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -4313,10 +4337,10 @@ Expected: FAIL — `Unresolved reference: SessionStore` / `Auth` / `LoginViewMod
 
 - [ ] **Step 4: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/session/SessionStore.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/session/SessionStore.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.session
+package de.safetube.parent.session
 
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -4325,9 +4349,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.core.push.OpenRequestCheck
-import de.isoletta.safetube.core.push.SeenIds
+import de.safetube.core.api.ContentRequest
+import de.safetube.core.push.OpenRequestCheck
+import de.safetube.core.push.SeenIds
 import kotlinx.coroutines.flow.first
 
 data class Session(
@@ -4429,13 +4453,13 @@ class SessionStore(private val store: DataStore<Preferences>) {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/session/Auth.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/session/Auth.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.session
+package de.safetube.parent.session
 
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.attempt
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.attempt
 
 /** Anmelden und Abmelden. [apiFor] baut einen API-Client für eine Server-Adresse und ein Token. */
 class Auth(
@@ -4475,21 +4499,21 @@ class Auth(
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/AppContainer.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/AppContainer.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent
+package de.safetube.parent
 
 import android.content.Context
-import de.isoletta.safetube.core.api.HttpParentApi
-import de.isoletta.safetube.core.api.HttpTransport
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.extractor.NewPipeSource
-import de.isoletta.safetube.core.extractor.OkHttpDownloader
-import de.isoletta.safetube.core.extractor.YouTubeSource
-import de.isoletta.safetube.parent.session.Auth
-import de.isoletta.safetube.parent.session.SessionStore
-import de.isoletta.safetube.parent.session.sessionDataStore
+import de.safetube.core.api.HttpParentApi
+import de.safetube.core.api.HttpTransport
+import de.safetube.core.api.ParentApi
+import de.safetube.core.extractor.NewPipeSource
+import de.safetube.core.extractor.OkHttpDownloader
+import de.safetube.core.extractor.YouTubeSource
+import de.safetube.parent.session.Auth
+import de.safetube.parent.session.SessionStore
+import de.safetube.parent.session.sessionDataStore
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 
@@ -4515,10 +4539,10 @@ class AppContainer(context: Context) {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/ParentApp.kt` (ersetzt die Fassung aus Task 10):
+`android/parent/src/main/kotlin/de/safetube/parent/ParentApp.kt` (ersetzt die Fassung aus Task 10):
 
 ```kotlin
-package de.isoletta.safetube.parent
+package de.safetube.parent
 
 import android.app.Application
 import android.content.Context
@@ -4532,17 +4556,17 @@ val Context.container: AppContainer
     get() = (applicationContext as ParentApp).container
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/login/LoginViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/login/LoginViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.login
+package de.safetube.parent.login
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.ApiException
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
-import de.isoletta.safetube.parent.session.Auth
+import de.safetube.core.api.ApiException
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
+import de.safetube.parent.session.Auth
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -4596,10 +4620,10 @@ class LoginViewModel(private val auth: Auth, defaultServer: String) : ViewModel(
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/login/LoginScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/login/LoginScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.login
+package de.safetube.parent.login
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -4627,7 +4651,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.isoletta.safetube.parent.container
+import de.safetube.parent.container
 
 @Composable
 fun LoginScreen(onLoggedIn: () -> Unit) {
@@ -4709,13 +4733,13 @@ git commit -m "Eltern-App: Sitzung, Anmeldung und Test-Hilfen"
 ### Task 12: Navigation, gemeinsame Bausteine und Übersicht (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/Routes.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/ui/Common.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/overview/OverviewViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/overview/OverviewScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/MainActivity.kt` (ganz ersetzen)
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/overview/OverviewViewModelTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/nav/Routes.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/ui/Common.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/overview/OverviewViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/overview/OverviewScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/MainActivity.kt` (ganz ersetzen)
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/overview/OverviewViewModelTest.kt`
 
 **Muster für alle Listen-Bildschirme:** Das ViewModel lädt nicht im `init`, sondern der Bildschirm ruft `refresh()`/`load()` per `LifecycleResumeEffect` bei jedem Erscheinen auf — so sind die Daten nach dem Zurückkehren von einem Unterbildschirm aktuell. Tests rufen `refresh()`/`load()` selbst auf.
 
@@ -4723,15 +4747,15 @@ git commit -m "Eltern-App: Sitzung, Anmeldung und Test-Hilfen"
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/overview/OverviewViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/overview/OverviewViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.overview
+package de.safetube.parent.overview
 
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.core.api.RequestStatus
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.Samples
 import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -4803,15 +4827,15 @@ class OverviewViewModelTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.overview.*'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.overview.*'`
 Expected: FAIL — `Unresolved reference: OverviewViewModel`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/Routes.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/nav/Routes.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.nav
+package de.safetube.parent.nav
 
 object Routes {
     const val LOGIN = "login"
@@ -4837,10 +4861,10 @@ object Routes {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/ui/Common.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/ui/Common.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.ui
+package de.safetube.parent.ui
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -4879,7 +4903,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import de.isoletta.safetube.core.api.Child
+import de.safetube.core.api.Child
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -4979,19 +5003,19 @@ fun TextInputDialog(
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/overview/OverviewViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/overview/OverviewViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.overview
+package de.safetube.parent.overview
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.Child
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.RequestFilter
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
+import de.safetube.core.api.Child
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.RequestFilter
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -5042,10 +5066,10 @@ class OverviewViewModel(private val api: ParentApi) : ViewModel() {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/overview/OverviewScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/overview/OverviewScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.overview
+package de.safetube.parent.overview
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -5077,12 +5101,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.isoletta.safetube.core.format.Formats
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.ErrorMessage
-import de.isoletta.safetube.parent.ui.Loading
-import de.isoletta.safetube.parent.ui.ScreenScaffold
-import de.isoletta.safetube.parent.ui.TextInputDialog
+import de.safetube.core.format.Formats
+import de.safetube.parent.container
+import de.safetube.parent.ui.ErrorMessage
+import de.safetube.parent.ui.Loading
+import de.safetube.parent.ui.ScreenScaffold
+import de.safetube.parent.ui.TextInputDialog
 import java.time.Instant
 
 class OverviewActions(
@@ -5185,10 +5209,10 @@ private fun ChildCardView(card: ChildCard, now: Instant, actions: OverviewAction
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.nav
+package de.safetube.parent.nav
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
@@ -5214,9 +5238,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import de.isoletta.safetube.parent.login.LoginScreen
-import de.isoletta.safetube.parent.overview.OverviewActions
-import de.isoletta.safetube.parent.overview.OverviewScreen
+import de.safetube.parent.login.LoginScreen
+import de.safetube.parent.overview.OverviewActions
+import de.safetube.parent.overview.OverviewScreen
 
 private data class TopLevel(val route: String, val label: String, val icon: ImageVector)
 
@@ -5313,10 +5337,10 @@ private fun BottomBar(nav: NavHostController, current: String?) {
 
 Hinweis: `onLoggedOut` wird ab Task 21 (Eltern-Bildschirm, Abmelden) benutzt; bis dahin ist der Parameter vorhanden, aber ungenutzt (Kotlin-Warnung, kein Fehler).
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/MainActivity.kt` (ersetzt die Fassung aus Task 10):
+`android/parent/src/main/kotlin/de/safetube/parent/MainActivity.kt` (ersetzt die Fassung aus Task 10):
 
 ```kotlin
-package de.isoletta.safetube.parent
+package de.safetube.parent
 
 import android.content.Intent
 import android.os.Bundle
@@ -5328,9 +5352,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import de.isoletta.safetube.android.ui.SafeTubeTheme
-import de.isoletta.safetube.parent.nav.ParentNavHost
-import de.isoletta.safetube.parent.ui.Loading
+import de.safetube.android.ui.SafeTubeTheme
+import de.safetube.parent.nav.ParentNavHost
+import de.safetube.parent.ui.Loading
 
 class MainActivity : ComponentActivity() {
 
@@ -5391,24 +5415,24 @@ git commit -m "Eltern-App: Navigation, gemeinsame Bausteine und Übersicht"
 ### Task 13: Anfragen-Liste (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/requests/RequestsViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/requests/RequestsScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt` (Route `REQUESTS`)
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/requests/RequestsViewModelTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/requests/RequestsViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/requests/RequestsScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt` (Route `REQUESTS`)
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/requests/RequestsViewModelTest.kt`
 
 Spec 7: offene Anfragen oben, darunter die History; Filter Kind / Status / Zeitraum. **Offene Anfragen werden unabhängig vom Zeitraum immer gezeigt** — sonst verschwände eine alte, noch unbeantwortete Anfrage aus dem Blick.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/requests/RequestsViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/requests/RequestsViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.requests
+package de.safetube.parent.requests
 
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.core.api.RequestStatus
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.Samples
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Rule
@@ -5479,25 +5503,25 @@ class RequestsViewModelTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.requests.RequestsViewModelTest'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.requests.RequestsViewModelTest'`
 Expected: FAIL — `Unresolved reference: RequestsViewModel`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/requests/RequestsViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/requests/RequestsViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.requests
+package de.safetube.parent.requests
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.Child
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.RequestFilter
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
+import de.safetube.core.api.Child
+import de.safetube.core.api.ContentRequest
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.RequestFilter
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -5582,10 +5606,10 @@ class RequestsViewModel(
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/requests/RequestsScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/requests/RequestsScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.requests
+package de.safetube.parent.requests
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -5619,15 +5643,15 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.core.format.Formats
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.ChildFilter
-import de.isoletta.safetube.parent.ui.ErrorMessage
-import de.isoletta.safetube.parent.ui.Loading
-import de.isoletta.safetube.parent.ui.ScreenScaffold
+import de.safetube.core.api.ContentRequest
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.api.TargetType
+import de.safetube.core.format.Formats
+import de.safetube.parent.container
+import de.safetube.parent.ui.ChildFilter
+import de.safetube.parent.ui.ErrorMessage
+import de.safetube.parent.ui.Loading
+import de.safetube.parent.ui.ScreenScaffold
 
 @Composable
 fun RequestsScreen(onOpen: (Int) -> Unit) {
@@ -5697,7 +5721,8 @@ private fun SectionTitle(text: String) {
 
 @Composable
 private fun RequestRow(request: ContentRequest, onOpen: (Int) -> Unit) {
-    val kind = if (request.targetType == TargetType.VIDEO) "Video" else "Kanal"
+    val kind = (if (request.targetType == TargetType.VIDEO) "Video" else "Kanal") +
+        (if (request.liftsBlock) " (gesperrt)" else "")
     val status = when (request.status) {
         RequestStatus.OPEN -> "offen"
         RequestStatus.APPROVED -> "freigegeben" + (request.decidedByName?.let { " von $it" } ?: "")
@@ -5724,7 +5749,7 @@ private fun RequestRow(request: ContentRequest, onOpen: (Int) -> Unit) {
 }
 ```
 
-In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.isoletta.safetube.parent.requests.RequestsScreen`):
+In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.safetube.parent.requests.RequestsScreen`):
 
 ```kotlin
             composable(Routes.REQUESTS) {
@@ -5749,31 +5774,31 @@ git commit -m "Eltern-App: Anfragen-Liste mit Filtern"
 ### Task 14: Vorschau-Player und Anfrage-Detail mit Entscheidungen
 
 **Files:**
-- Create: `android/core-android/src/main/kotlin/de/isoletta/safetube/android/player/PreviewPlayer.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/requests/RequestDetailViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/requests/RequestDetailScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt` (Route `REQUEST`)
-- Create (Test-Hilfe): `android/parent/src/test/kotlin/de/isoletta/safetube/parent/testing/FakeYouTubeSource.kt`
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/requests/RequestDetailViewModelTest.kt`
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/requests/RequestDetailScreenTest.kt`
+- Create: `android/core-android/src/main/kotlin/de/safetube/android/player/PreviewPlayer.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/requests/RequestDetailViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/requests/RequestDetailScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt` (Route `REQUEST`)
+- Create (Test-Hilfe): `android/parent/src/test/kotlin/de/safetube/parent/testing/FakeYouTubeSource.kt`
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/requests/RequestDetailViewModelTest.kt`
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/requests/RequestDetailScreenTest.kt`
 
 Spec 7, Anfrage-Detail: Vorschaubild, Titel, Kanal, Nachricht des Kindes, Link; bei Kanal-Anfragen die letzten 10 Videos; eingebauter Vorschau-Player (ohne Filter) und [In YouTube öffnen]. Aktionen siehe Festlegung 10. Eine bereits entschiedene Anfrage lässt sich neu entscheiden (der Server legt dann die Regel neu an bzw. nimmt sie zurück).
 
 - [ ] **Step 1: Test-Hilfe und failing tests schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/testing/FakeYouTubeSource.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/testing/FakeYouTubeSource.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.testing
+package de.safetube.parent.testing
 
-import de.isoletta.safetube.core.extractor.ChannelPage
-import de.isoletta.safetube.core.extractor.SearchFilter
-import de.isoletta.safetube.core.extractor.SearchHit
-import de.isoletta.safetube.core.extractor.StreamCandidate
-import de.isoletta.safetube.core.extractor.StreamDetails
-import de.isoletta.safetube.core.extractor.StreamKind
-import de.isoletta.safetube.core.extractor.VideoItem
-import de.isoletta.safetube.core.extractor.YouTubeSource
+import de.safetube.core.extractor.ChannelPage
+import de.safetube.core.extractor.SearchFilter
+import de.safetube.core.extractor.SearchHit
+import de.safetube.core.extractor.StreamCandidate
+import de.safetube.core.extractor.StreamDetails
+import de.safetube.core.extractor.StreamKind
+import de.safetube.core.extractor.VideoItem
+import de.safetube.core.extractor.YouTubeSource
 
 class FakeYouTubeSource : YouTubeSource {
     val calls = mutableListOf<String>()
@@ -5827,23 +5852,23 @@ class FakeYouTubeSource : YouTubeSource {
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/requests/RequestDetailViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/requests/RequestDetailViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.requests
+package de.safetube.parent.requests
 
-import de.isoletta.safetube.core.api.ApiException
-import de.isoletta.safetube.core.api.DecisionAction
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.api.Scope
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.core.api.YouTubeException
-import de.isoletta.safetube.core.extractor.PlaybackSource
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.FakeYouTubeSource
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.core.api.ApiException
+import de.safetube.core.api.DecisionAction
+import de.safetube.core.api.Effect
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.api.Scope
+import de.safetube.core.api.TargetType
+import de.safetube.core.api.YouTubeException
+import de.safetube.core.extractor.PlaybackSource
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.FakeYouTubeSource
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.Samples
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -5988,18 +6013,18 @@ class RequestDetailViewModelTest {
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/requests/RequestDetailScreenTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/requests/RequestDetailScreenTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.requests
+package de.safetube.parent.requests
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import de.isoletta.safetube.android.ui.SafeTubeTheme
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.android.ui.SafeTubeTheme
+import de.safetube.core.api.TargetType
+import de.safetube.parent.testing.Samples
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -6051,20 +6076,29 @@ class RequestDetailScreenTest {
 
         assertEquals(listOf("videoOnly"), clicks)
     }
+
+    @Test
+    fun `Aufhebung einer Sperre ist erkennbar und zeigt die Begründung`() {
+        val request = Samples.request(1, liftsBlock = true, childMessage = "Brauche ich für Bio")
+        compose.setContent { SafeTubeTheme { RequestDetailContent(RequestDetailState(loading = false, request = request), actions) } }
+
+        compose.onNodeWithText("Bittet um Aufhebung einer Sperre").assertExists()
+        compose.onNodeWithText("„Brauche ich für Bio“").assertExists()
+    }
 }
 ```
 
 - [ ] **Step 2: Tests laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.requests.RequestDetail*'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.requests.RequestDetail*'`
 Expected: FAIL — `Unresolved reference: RequestDetailViewModel` / `RequestDetailContent`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/core-android/src/main/kotlin/de/isoletta/safetube/android/player/PreviewPlayer.kt`:
+`android/core-android/src/main/kotlin/de/safetube/android/player/PreviewPlayer.kt`:
 
 ```kotlin
-package de.isoletta.safetube.android.player
+package de.safetube.android.player
 
 import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.aspectRatio
@@ -6084,8 +6118,8 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
-import de.isoletta.safetube.core.extractor.OkHttpDownloader
-import de.isoletta.safetube.core.extractor.PlaybackSource
+import de.safetube.core.extractor.OkHttpDownloader
+import de.safetube.core.extractor.PlaybackSource
 
 /** Einfacher Player für die Elternvorschau: spielt sofort los, gibt beim Verlassen alles frei. */
 @Composable
@@ -6125,27 +6159,27 @@ object MediaSources {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/requests/RequestDetailViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/requests/RequestDetailViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.requests
+package de.safetube.parent.requests
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.core.api.Decision
-import de.isoletta.safetube.core.api.DecisionAction
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.RuleCreate
-import de.isoletta.safetube.core.api.Scope
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
-import de.isoletta.safetube.core.extractor.PlaybackSource
-import de.isoletta.safetube.core.extractor.StreamChoice
-import de.isoletta.safetube.core.extractor.VideoItem
-import de.isoletta.safetube.core.extractor.YouTubeSource
+import de.safetube.core.api.ContentRequest
+import de.safetube.core.api.Decision
+import de.safetube.core.api.DecisionAction
+import de.safetube.core.api.Effect
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.RuleCreate
+import de.safetube.core.api.Scope
+import de.safetube.core.api.TargetType
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
+import de.safetube.core.extractor.PlaybackSource
+import de.safetube.core.extractor.StreamChoice
+import de.safetube.core.extractor.VideoItem
+import de.safetube.core.extractor.YouTubeSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -6284,10 +6318,10 @@ class RequestDetailViewModel(
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/requests/RequestDetailScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/requests/RequestDetailScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.requests
+package de.safetube.parent.requests
 
 import android.content.Intent
 import android.net.Uri
@@ -6325,17 +6359,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import de.isoletta.safetube.android.player.PreviewPlayer
-import de.isoletta.safetube.core.api.ContentRequest
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.api.Scope
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.core.format.Formats
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.ErrorMessage
-import de.isoletta.safetube.parent.ui.Loading
-import de.isoletta.safetube.parent.ui.ScreenScaffold
-import de.isoletta.safetube.parent.ui.TextInputDialog
+import de.safetube.android.player.PreviewPlayer
+import de.safetube.core.api.ContentRequest
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.api.Scope
+import de.safetube.core.api.TargetType
+import de.safetube.core.format.Formats
+import de.safetube.parent.container
+import de.safetube.parent.ui.ErrorMessage
+import de.safetube.parent.ui.Loading
+import de.safetube.parent.ui.ScreenScaffold
+import de.safetube.parent.ui.TextInputDialog
 
 class RequestDetailActions(
     val onBack: () -> Unit,
@@ -6473,6 +6507,14 @@ private fun Header(request: ContentRequest) {
         val kind = if (request.targetType == TargetType.VIDEO) "Video von ${request.channelName}" else "Ganzer Kanal"
         Text(kind)
         Text("Anfrage von ${request.childName} · ${Formats.dateTime(request.createdAt)}", style = MaterialTheme.typography.bodySmall)
+        if (request.liftsBlock) {
+            // Festlegung 15: Das Kind fragt zu etwas, das ausdrücklich gesperrt ist.
+            Text(
+                "Bittet um Aufhebung einer Sperre",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
         if (request.childMessage.isNotBlank()) {
             Text("„${request.childMessage}“", style = MaterialTheme.typography.bodyLarge)
         }
@@ -6535,7 +6577,7 @@ private fun DecisionBlock(
 }
 ```
 
-In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.isoletta.safetube.parent.requests.RequestDetailScreen`):
+In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.safetube.parent.requests.RequestDetailScreen`):
 
 ```kotlin
             composable(Routes.REQUEST, arguments = requestIdArg) { entry ->
@@ -6552,7 +6594,7 @@ Task 22 ersetzt `onDecided = { }` durch das Entfernen der zugehörigen Benachric
 - [ ] **Step 4: Tests und Build**
 
 Run: `android/tools/remote-build.sh :parent:testDebugUnitTest :parent:assembleDebug`
-Expected: BUILD SUCCESSFUL, `RequestDetailViewModelTest` (10) und `RequestDetailScreenTest` (2) grün.
+Expected: BUILD SUCCESSFUL, `RequestDetailViewModelTest` (10) und `RequestDetailScreenTest` (3) grün.
 
 - [ ] **Step 5: Commit**
 
@@ -6566,25 +6608,25 @@ git commit -m "Eltern-App: Anfrage-Detail mit Vorschau-Player und allen Entschei
 ### Task 15: Regeln ansehen, bearbeiten, löschen (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/rules/RulesViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/rules/RulesScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt` (Route `RULES`)
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/rules/RulesViewModelTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/rules/RulesViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/rules/RulesScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt` (Route `RULES`)
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/rules/RulesViewModelTest.kt`
 
 Spec 7: Liste pro Kind bzw. „alle Kinder“, Suche, Bearbeiten, Löschen. Auswahl oben: **Alle Regeln**, **Für alle Kinder** (`global_only`) oder ein Kind (dessen Regeln plus die für alle). Die Suche filtert lokal über Titel, Kanalname und ID.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/rules/RulesViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/rules/RulesViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.rules
+package de.safetube.parent.rules
 
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.core.api.Effect
+import de.safetube.core.api.TargetType
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.Samples
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -6663,25 +6705,25 @@ class RulesViewModelTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.rules.RulesViewModelTest'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.rules.RulesViewModelTest'`
 Expected: FAIL — `Unresolved reference: RulesViewModel`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/rules/RulesViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/rules/RulesViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.rules
+package de.safetube.parent.rules
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.Child
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.Rule
-import de.isoletta.safetube.core.api.RuleUpdate
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
+import de.safetube.core.api.Child
+import de.safetube.core.api.Effect
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.Rule
+import de.safetube.core.api.RuleUpdate
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -6767,10 +6809,10 @@ class RulesViewModel(private val api: ParentApi) : ViewModel() {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/rules/RulesScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/rules/RulesScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.rules
+package de.safetube.parent.rules
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -6809,14 +6851,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.Rule
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.ConfirmDialog
-import de.isoletta.safetube.parent.ui.ErrorMessage
-import de.isoletta.safetube.parent.ui.Loading
-import de.isoletta.safetube.parent.ui.ScreenScaffold
+import de.safetube.core.api.Effect
+import de.safetube.core.api.Rule
+import de.safetube.core.api.TargetType
+import de.safetube.parent.container
+import de.safetube.parent.ui.ConfirmDialog
+import de.safetube.parent.ui.ErrorMessage
+import de.safetube.parent.ui.Loading
+import de.safetube.parent.ui.ScreenScaffold
 
 @Composable
 fun RulesScreen(onAdd: () -> Unit) {
@@ -6950,7 +6992,7 @@ private fun RuleEditDialog(rule: Rule, onSave: (Effect, String) -> Unit, onDelet
 }
 ```
 
-In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.isoletta.safetube.parent.rules.RulesScreen`):
+In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.safetube.parent.rules.RulesScreen`):
 
 ```kotlin
             composable(Routes.RULES) {
@@ -6975,30 +7017,30 @@ git commit -m "Eltern-App: Regeln ansehen, bearbeiten und löschen"
 ### Task 16: Neue Regel per Link oder Suche (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/rules/AddRuleViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/rules/AddRuleScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt` (Route `RULE_ADD`)
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/rules/AddRuleViewModelTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/rules/AddRuleViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/rules/AddRuleScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt` (Route `RULE_ADD`)
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/rules/AddRuleViewModelTest.kt`
 
 Spec 7: neue Regel per eingefügtem Link oder In-App-Suche. Aus Link oder Treffer entsteht ein Entwurf (Typ, ID, Titel, Kanalname); dazu wählt man Erlauben/Sperren, Bereich (Kind oder alle) und optional eine Notiz. Kanal-Aliase (`@handle`) werden über den Extractor zur ID aufgelöst (Festlegung 12). Schlägt das Nachladen des Titels bei bekannter ID fehl, entsteht der Entwurf trotzdem (ohne Titel).
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/rules/AddRuleViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/rules/AddRuleViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.rules
+package de.safetube.parent.rules
 
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.core.api.YouTubeException
-import de.isoletta.safetube.core.extractor.ChannelItem
-import de.isoletta.safetube.core.extractor.SearchFilter
-import de.isoletta.safetube.core.extractor.SearchHit
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.FakeYouTubeSource
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.core.api.Effect
+import de.safetube.core.api.TargetType
+import de.safetube.core.api.YouTubeException
+import de.safetube.core.extractor.ChannelItem
+import de.safetube.core.extractor.SearchFilter
+import de.safetube.core.extractor.SearchHit
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.FakeYouTubeSource
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.Samples
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -7115,30 +7157,30 @@ class AddRuleViewModelTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.rules.AddRuleViewModelTest'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.rules.AddRuleViewModelTest'`
 Expected: FAIL — `Unresolved reference: AddRuleViewModel`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/rules/AddRuleViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/rules/AddRuleViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.rules
+package de.safetube.parent.rules
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.Child
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.RuleCreate
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
-import de.isoletta.safetube.core.extractor.SearchFilter
-import de.isoletta.safetube.core.extractor.SearchHit
-import de.isoletta.safetube.core.extractor.YouTubeSource
-import de.isoletta.safetube.core.youtube.YouTubeIds
-import de.isoletta.safetube.core.youtube.YouTubeLink
+import de.safetube.core.api.Child
+import de.safetube.core.api.Effect
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.RuleCreate
+import de.safetube.core.api.TargetType
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
+import de.safetube.core.extractor.SearchFilter
+import de.safetube.core.extractor.SearchHit
+import de.safetube.core.extractor.YouTubeSource
+import de.safetube.core.youtube.YouTubeIds
+import de.safetube.core.youtube.YouTubeLink
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -7280,10 +7322,10 @@ class AddRuleViewModel(private val api: ParentApi, private val youtube: YouTubeS
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/rules/AddRuleScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/rules/AddRuleScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.rules
+package de.safetube.parent.rules
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -7319,14 +7361,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.core.extractor.SearchFilter
-import de.isoletta.safetube.core.extractor.SearchHit
-import de.isoletta.safetube.core.format.Formats
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.ChildFilter
-import de.isoletta.safetube.parent.ui.ScreenScaffold
+import de.safetube.core.api.Effect
+import de.safetube.core.api.TargetType
+import de.safetube.core.extractor.SearchFilter
+import de.safetube.core.extractor.SearchHit
+import de.safetube.core.format.Formats
+import de.safetube.parent.container
+import de.safetube.parent.ui.ChildFilter
+import de.safetube.parent.ui.ScreenScaffold
 
 @Composable
 fun AddRuleScreen(onDone: () -> Unit) {
@@ -7442,7 +7484,7 @@ private fun DraftCard(state: AddRuleState, draft: RuleDraft, vm: AddRuleViewMode
 }
 ```
 
-In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.isoletta.safetube.parent.rules.AddRuleScreen`):
+In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.safetube.parent.rules.AddRuleScreen`):
 
 ```kotlin
             composable(Routes.RULE_ADD) {
@@ -7467,25 +7509,25 @@ git commit -m "Eltern-App: neue Regel per Link oder Suche"
 ### Task 17: Verlauf (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/history/HistoryViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/history/HistoryScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt` (Route `HISTORY`)
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/history/HistoryViewModelTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/history/HistoryViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/history/HistoryScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt` (Route `HISTORY`)
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/history/HistoryViewModelTest.kt`
 
 Spec 7: Zeitleiste pro Kind; je Eintrag Video/Kanal freigeben oder sperren. Der Server liefert `allowed_now` (wie das Gate heute entscheiden würde). Geblättert wird mit `before = startedAt` des letzten Eintrags; eine volle Seite (50) heißt „es gibt vielleicht mehr“. Nach einer neuen Regel wird die erste Seite neu geladen, damit `allowed_now` stimmt.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/history/HistoryViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/history/HistoryViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.history
+package de.safetube.parent.history
 
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.core.api.Effect
+import de.safetube.core.api.TargetType
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.Samples
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -7551,25 +7593,25 @@ class HistoryViewModelTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.history.*'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.history.*'`
 Expected: FAIL — `Unresolved reference: HistoryViewModel`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/history/HistoryViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/history/HistoryViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.history
+package de.safetube.parent.history
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.HistoryEntry
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.RuleCreate
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
+import de.safetube.core.api.Effect
+import de.safetube.core.api.HistoryEntry
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.RuleCreate
+import de.safetube.core.api.TargetType
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -7657,10 +7699,10 @@ class HistoryViewModel(
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/history/HistoryScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/history/HistoryScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.history
+package de.safetube.parent.history
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7692,14 +7734,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.isoletta.safetube.core.api.Effect
-import de.isoletta.safetube.core.api.HistoryEntry
-import de.isoletta.safetube.core.api.TargetType
-import de.isoletta.safetube.core.format.Formats
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.ErrorMessage
-import de.isoletta.safetube.parent.ui.Loading
-import de.isoletta.safetube.parent.ui.ScreenScaffold
+import de.safetube.core.api.Effect
+import de.safetube.core.api.HistoryEntry
+import de.safetube.core.api.TargetType
+import de.safetube.core.format.Formats
+import de.safetube.parent.container
+import de.safetube.parent.ui.ErrorMessage
+import de.safetube.parent.ui.Loading
+import de.safetube.parent.ui.ScreenScaffold
 
 @Composable
 fun HistoryScreen(childId: Int, onBack: () -> Unit) {
@@ -7773,7 +7815,7 @@ private fun HistoryRow(entry: HistoryEntry, onRule: (HistoryEntry, TargetType, E
 }
 ```
 
-In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.isoletta.safetube.parent.history.HistoryScreen`):
+In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.safetube.parent.history.HistoryScreen`):
 
 ```kotlin
             composable(Routes.HISTORY, arguments = childIdArg) { entry ->
@@ -7798,26 +7840,26 @@ git commit -m "Eltern-App: Verlauf mit Freigeben/Sperren je Eintrag"
 ### Task 18: Statistik (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/stats/StatsViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/stats/StatsScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt` (Route `STATS`)
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/stats/StatsViewModelTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/stats/StatsViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/stats/StatsScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt` (Route `STATS`)
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/stats/StatsViewModelTest.kt`
 
 Spec 7: pro Tag/Woche, Top-Kanäle, Anteil Belohnungsmodus. Umschaltbar 7 oder 30 Tage; die Tage kommen vom Server schon in Berliner Zeit. Balken als einfache Compose-Boxen (keine Diagramm-Bibliothek).
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/stats/StatsViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/stats/StatsViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.stats
+package de.safetube.parent.stats
 
-import de.isoletta.safetube.core.api.ChannelStat
-import de.isoletta.safetube.core.api.DayStat
-import de.isoletta.safetube.core.api.Stats
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.core.api.ChannelStat
+import de.safetube.core.api.DayStat
+import de.safetube.core.api.Stats
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.Samples
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -7869,22 +7911,22 @@ class StatsViewModelTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.stats.*'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.stats.*'`
 Expected: FAIL — `Unresolved reference: StatsViewModel`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/stats/StatsViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/stats/StatsViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.stats
+package de.safetube.parent.stats
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.Stats
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.Stats
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -7931,10 +7973,10 @@ class StatsViewModel(private val api: ParentApi, private val childId: Int) : Vie
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/stats/StatsScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/stats/StatsScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.stats
+package de.safetube.parent.stats
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -7961,12 +8003,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.isoletta.safetube.core.api.DayStat
-import de.isoletta.safetube.core.format.Formats
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.ErrorMessage
-import de.isoletta.safetube.parent.ui.Loading
-import de.isoletta.safetube.parent.ui.ScreenScaffold
+import de.safetube.core.api.DayStat
+import de.safetube.core.format.Formats
+import de.safetube.parent.container
+import de.safetube.parent.ui.ErrorMessage
+import de.safetube.parent.ui.Loading
+import de.safetube.parent.ui.ScreenScaffold
 
 @Composable
 fun StatsScreen(childId: Int, onBack: () -> Unit) {
@@ -8036,7 +8078,7 @@ private fun DayBar(day: DayStat, max: Int) {
 
 Der helle Teil (`tertiary`) eines Balkens ist der Anteil im Belohnungsmodus. `+ 0.0001f` verhindert ein Gewicht von 0, wenn der ganze Tag im Belohnungsmodus lag (Compose verlangt Gewichte > 0).
 
-In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.isoletta.safetube.parent.stats.StatsScreen`):
+In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.safetube.parent.stats.StatsScreen`):
 
 ```kotlin
             composable(Routes.STATS, arguments = childIdArg) { entry ->
@@ -8061,23 +8103,23 @@ git commit -m "Eltern-App: Statistik pro Tag, Top-Kanäle, Anteil Belohnungsmodu
 ### Task 19: Belohnungsmodus (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/reward/RewardViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/reward/RewardScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt` (Route `REWARD`)
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/reward/RewardViewModelTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/reward/RewardViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/reward/RewardScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt` (Route `REWARD`)
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/reward/RewardViewModelTest.kt`
 
 Spec 7: Dauer (Tage/Stunden/Minuten) oder Endzeit, Schalter „auch Gesperrtes“, [Sofort beenden]. Immer zeitlich begrenzt (höchstens 30 Tage), Ablauf nach Serveruhr. Endzeit wird in Berliner Zeit eingegeben.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/reward/RewardViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/reward/RewardViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.reward
+package de.safetube.parent.reward
 
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.Samples
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -8184,25 +8226,25 @@ class RewardViewModelTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.reward.*'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.reward.*'`
 Expected: FAIL — `Unresolved reference: RewardViewModel`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/reward/RewardViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/reward/RewardViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.reward
+package de.safetube.parent.reward
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.Child
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.RewardStart
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
-import de.isoletta.safetube.core.format.Formats
-import de.isoletta.safetube.core.format.RewardDuration
+import de.safetube.core.api.Child
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.RewardStart
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
+import de.safetube.core.format.Formats
+import de.safetube.core.format.RewardDuration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -8307,10 +8349,10 @@ class RewardViewModel(
 
 Hinweis: In der Rundung ergibt `(minute + 14) / 15 * 15` bei Minute 0 genau 0 (volle Stunde bleibt), bei 1–15 → 15 usw.; 60 rollt über `plusMinutes` in die nächste Stunde.
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/reward/RewardScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/reward/RewardScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.reward
+package de.safetube.parent.reward
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8351,10 +8393,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.isoletta.safetube.core.format.Formats
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.Loading
-import de.isoletta.safetube.parent.ui.ScreenScaffold
+import de.safetube.core.format.Formats
+import de.safetube.parent.container
+import de.safetube.parent.ui.Loading
+import de.safetube.parent.ui.ScreenScaffold
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneOffset
@@ -8482,7 +8524,7 @@ private fun UntilFields(state: RewardState, vm: RewardViewModel) {
 }
 ```
 
-In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.isoletta.safetube.parent.reward.RewardScreen`):
+In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.safetube.parent.reward.RewardScreen`):
 
 ```kotlin
             composable(Routes.REWARD, arguments = childIdArg) { entry ->
@@ -8507,21 +8549,21 @@ git commit -m "Eltern-App: Belohnungsmodus mit Dauer oder Endzeit"
 ### Task 20: Kind-Einstellungen, Kopplungs-QR-Code, Geräte (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/child/QrCode.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/child/ChildSettingsViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/child/ChildSettingsScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt` (Route `CHILD`)
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/child/QrCodeTest.kt`
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/child/ChildSettingsViewModelTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/child/QrCode.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/child/ChildSettingsViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/child/ChildSettingsScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt` (Route `CHILD`)
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/child/QrCodeTest.kt`
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/child/ChildSettingsViewModelTest.kt`
 
-Spec 7: Anzeige `compact`/`full`, Shorts an/aus, Kopplungs-QR-Code, Geräte mit App-Version, Entkoppeln. Der QR-Code enthält `qr_payload` vom Server (`{"server": …, "code": …}`); die Kinder-App (Plan 3) liest ihn. Der Code gilt 10 Minuten und wird zusätzlich als Text angezeigt (zum Abtippen).
+Spec 7: Anzeige `compact`/`full`, Shorts an/aus, Kopplungs-QR-Code, Geräte mit App-Version, Entkoppeln. Dazu **Kind löschen** (Festlegung 16) ganz unten, mit Rückfrage, die den Namen nennt und sagt, was alles verschwindet; danach zurück zur Übersicht. Der QR-Code enthält `qr_payload` vom Server (`{"server": …, "code": …}`); die Kinder-App (Plan 3) liest ihn. Der Code gilt 10 Minuten und wird zusätzlich als Text angezeigt (zum Abtippen).
 
 - [ ] **Step 1: Failing tests schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/child/QrCodeTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/child/QrCodeTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.child
+package de.safetube.parent.child
 
 import com.google.zxing.BinaryBitmap
 import com.google.zxing.DecodeHintType
@@ -8548,15 +8590,15 @@ class QrCodeTest {
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/child/ChildSettingsViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/child/ChildSettingsViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.child
+package de.safetube.parent.child
 
-import de.isoletta.safetube.core.api.DisplayMode
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
-import de.isoletta.safetube.parent.testing.Samples
+import de.safetube.core.api.DisplayMode
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.Samples
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -8620,20 +8662,31 @@ class ChildSettingsViewModelTest {
         assertEquals("Gerät entkoppelt", vm.state.value.message)
         assertFalse(vm.state.value.busy)
     }
+
+    @Test
+    fun `Kind löschen`() {
+        val vm = viewModel()
+
+        vm.deleteChild()
+
+        assertTrue(vm.state.value.deleted)
+        assertTrue("deleteChild 1" in api.calls)
+        assertTrue(api.childrenList.none { it.id == 1 })
+    }
 }
 ```
 
 - [ ] **Step 2: Tests laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.child.*'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.child.*'`
 Expected: FAIL — `Unresolved reference: QrCode` / `ChildSettingsViewModel`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/child/QrCode.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/child/QrCode.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.child
+package de.safetube.parent.child
 
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.ImageBitmap
@@ -8661,21 +8714,21 @@ object QrCode {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/child/ChildSettingsViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/child/ChildSettingsViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.child
+package de.safetube.parent.child
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.Child
-import de.isoletta.safetube.core.api.ChildUpdate
-import de.isoletta.safetube.core.api.Device
-import de.isoletta.safetube.core.api.DisplayMode
-import de.isoletta.safetube.core.api.PairingCode
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
+import de.safetube.core.api.Child
+import de.safetube.core.api.ChildUpdate
+import de.safetube.core.api.Device
+import de.safetube.core.api.DisplayMode
+import de.safetube.core.api.PairingCode
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -8690,6 +8743,8 @@ data class ChildSettingsState(
     val busy: Boolean = false,
     val error: String? = null,
     val message: String? = null,
+    /** Kind ist gelöscht, der Bildschirm schließt sich. */
+    val deleted: Boolean = false,
 )
 
 class ChildSettingsViewModel(private val api: ParentApi, private val childId: Int) : ViewModel() {
@@ -8737,6 +8792,15 @@ class ChildSettingsViewModel(private val api: ParentApi, private val childId: In
         }
     }
 
+    fun deleteChild() {
+        _state.update { it.copy(busy = true) }
+        viewModelScope.launch {
+            attempt { api.deleteChild(childId) }
+                .onSuccess { _state.update { it.copy(busy = false, deleted = true) } }
+                .onFailure { e -> _state.update { it.copy(busy = false, message = e.userMessage()) } }
+        }
+    }
+
     fun messageShown() = _state.update { it.copy(message = null) }
 
     private fun change(update: ChildUpdate, message: String) {
@@ -8749,10 +8813,10 @@ class ChildSettingsViewModel(private val api: ParentApi, private val childId: In
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/child/ChildSettingsScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/child/ChildSettingsScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.child
+package de.safetube.parent.child
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -8787,14 +8851,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.isoletta.safetube.core.api.Device
-import de.isoletta.safetube.core.api.DisplayMode
-import de.isoletta.safetube.core.api.PairingCode
-import de.isoletta.safetube.core.format.Formats
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.ConfirmDialog
-import de.isoletta.safetube.parent.ui.Loading
-import de.isoletta.safetube.parent.ui.ScreenScaffold
+import de.safetube.core.api.Device
+import de.safetube.core.api.DisplayMode
+import de.safetube.core.api.PairingCode
+import de.safetube.core.format.Formats
+import de.safetube.parent.container
+import de.safetube.parent.ui.ConfirmDialog
+import de.safetube.parent.ui.Loading
+import de.safetube.parent.ui.ScreenScaffold
 
 @Composable
 fun ChildSettingsScreen(childId: Int, onBack: () -> Unit) {
@@ -8803,6 +8867,8 @@ fun ChildSettingsScreen(childId: Int, onBack: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var unpairing by remember { mutableStateOf<Device?>(null) }
+    var deleting by remember { mutableStateOf(false) }
+    LaunchedEffect(state.deleted) { if (state.deleted) onBack() }
     LaunchedEffect(state.message) {
         state.message?.let {
             snackbar.showSnackbar(it)
@@ -8856,7 +8922,22 @@ fun ChildSettingsScreen(childId: Int, onBack: () -> Unit) {
             Text("Geräte", style = MaterialTheme.typography.titleMedium)
             if (state.devices.isEmpty()) Text("Noch kein Gerät gekoppelt.")
             state.devices.forEach { device -> DeviceRow(device, enabled = !state.busy) { unpairing = device } }
+
+            HorizontalDivider()
+            OutlinedButton(onClick = { deleting = true }, enabled = !state.busy) {
+                Text("${child.name} löschen", color = MaterialTheme.colorScheme.error)
+            }
         }
+    }
+    if (deleting) {
+        ConfirmDialog(
+            title = "${state.child?.name.orEmpty()} löschen?",
+            text = "Gelöscht werden die eigenen Regeln, alle Anfragen, Verlauf und Schauzeit; gekoppelte Geräte " +
+                "werden abgemeldet. Regeln für alle Kinder bleiben. Das lässt sich nicht rückgängig machen.",
+            confirm = "Endgültig löschen",
+            onConfirm = { vm.deleteChild() },
+            onDismiss = { deleting = false },
+        )
     }
     unpairing?.let { device ->
         ConfirmDialog(
@@ -8901,7 +8982,7 @@ private fun DeviceRow(device: Device, enabled: Boolean, onUnpair: () -> Unit) {
 }
 ```
 
-In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.isoletta.safetube.parent.child.ChildSettingsScreen`):
+In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.safetube.parent.child.ChildSettingsScreen`):
 
 ```kotlin
             composable(Routes.CHILD, arguments = childIdArg) { entry ->
@@ -8912,7 +8993,7 @@ In `ParentNavHost.kt` unter `// Routen` einfügen (Import `de.isoletta.safetube.
 - [ ] **Step 4: Tests und Build**
 
 Run: `android/tools/remote-build.sh :parent:testDebugUnitTest :parent:assembleDebug`
-Expected: BUILD SUCCESSFUL, `QrCodeTest` (1) und `ChildSettingsViewModelTest` (4) grün.
+Expected: BUILD SUCCESSFUL, `QrCodeTest` (1) und `ChildSettingsViewModelTest` (5) grün.
 
 - [ ] **Step 5: Commit**
 
@@ -8926,22 +9007,22 @@ git commit -m "Eltern-App: Kind-Einstellungen, Kopplungs-QR-Code und Geräte"
 ### Task 21: Eltern und eigenes Konto (`parent`)
 
 **Files:**
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/parents/ParentsViewModel.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/parents/ParentsScreen.kt`
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/nav/ParentNavHost.kt` (Route `PARENTS`)
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/parents/ParentsViewModelTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/parents/ParentsViewModel.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/parents/ParentsScreen.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/nav/ParentNavHost.kt` (Route `PARENTS`)
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/parents/ParentsViewModelTest.kt`
 
 Spec 7: weitere gleichberechtigte Elternteile anlegen; eigene Mail-Einstellungen. Dazu Name und **Passwort ändern** (bisher nur per `curl`, siehe Plan 1) und Abmelden. Prüfungen wie der Server: Passwort mindestens 8 Zeichen.
 
 - [ ] **Step 1: Failing test schreiben**
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/parents/ParentsViewModelTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/parents/ParentsViewModelTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.parents
+package de.safetube.parent.parents
 
-import de.isoletta.safetube.parent.testing.FakeParentApi
-import de.isoletta.safetube.parent.testing.MainDispatcherRule
+import de.safetube.parent.testing.FakeParentApi
+import de.safetube.parent.testing.MainDispatcherRule
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9024,24 +9105,24 @@ class ParentsViewModelTest {
 
 - [ ] **Step 2: Test laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.parents.*'`
+Run: `android/tools/remote-build.sh :parent:testDebugUnitTest --tests 'de.safetube.parent.parents.*'`
 Expected: FAIL — `Unresolved reference: ParentsViewModel`.
 
 - [ ] **Step 3: Implementieren**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/parents/ParentsViewModel.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/parents/ParentsViewModel.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.parents
+package de.safetube.parent.parents
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import de.isoletta.safetube.core.api.MeUpdate
-import de.isoletta.safetube.core.api.Parent
-import de.isoletta.safetube.core.api.ParentApi
-import de.isoletta.safetube.core.api.ParentCreate
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
+import de.safetube.core.api.MeUpdate
+import de.safetube.core.api.Parent
+import de.safetube.core.api.ParentApi
+import de.safetube.core.api.ParentCreate
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -9148,10 +9229,10 @@ class ParentsViewModel(private val api: ParentApi, private val logout: suspend (
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/parents/ParentsScreen.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/parents/ParentsScreen.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.parents
+package de.safetube.parent.parents
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9187,10 +9268,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.isoletta.safetube.parent.container
-import de.isoletta.safetube.parent.ui.ConfirmDialog
-import de.isoletta.safetube.parent.ui.Loading
-import de.isoletta.safetube.parent.ui.ScreenScaffold
+import de.safetube.parent.container
+import de.safetube.parent.ui.ConfirmDialog
+import de.safetube.parent.ui.Loading
+import de.safetube.parent.ui.ScreenScaffold
 
 @Composable
 fun ParentsScreen(onLoggedOut: () -> Unit, logout: suspend () -> Unit) {
@@ -9336,7 +9417,7 @@ private fun PasswordDialog(onChange: (String, String) -> Unit, onDismiss: () -> 
 
 Prüffehler (z. B. „Passwörter verschieden“) erscheinen nach dem Schließen des Dialogs als roter Text unter den Mail-Schaltern.
 
-In `ParentNavHost.kt` unter `// Routen` einfügen (Importe `de.isoletta.safetube.parent.parents.ParentsScreen`, `de.isoletta.safetube.parent.container`, `androidx.compose.ui.platform.LocalContext`):
+In `ParentNavHost.kt` unter `// Routen` einfügen (Importe `de.safetube.parent.parents.ParentsScreen`, `de.safetube.parent.container`, `androidx.compose.ui.platform.LocalContext`):
 
 ```kotlin
             composable(Routes.PARENTS) {
@@ -9368,30 +9449,30 @@ git commit -m "Eltern-App: Eltern anlegen, Mail-Einstellungen, Passwort, Abmelde
 ### Task 22: Push-Empfang, Benachrichtigungen mit Aktionen, Abgleich, Akku
 
 **Files:**
-- Create: `android/core-android/src/main/kotlin/de/isoletta/safetube/android/push/NtfyForegroundService.kt`
-- Create: `android/core-android/src/main/kotlin/de/isoletta/safetube/android/system/BatteryOptimization.kt`
-- Test: `android/core-android/src/test/kotlin/de/isoletta/safetube/android/system/BatteryOptimizationTest.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/ParentPushHandler.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/ParentNotifier.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/ParentPushService.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/DecisionReceiver.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/BootReceiver.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/OpenRequestsWorker.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/PushControl.kt`
-- Create: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/PushSetupHints.kt`
+- Create: `android/core-android/src/main/kotlin/de/safetube/android/push/NtfyForegroundService.kt`
+- Create: `android/core-android/src/main/kotlin/de/safetube/android/system/BatteryOptimization.kt`
+- Test: `android/core-android/src/test/kotlin/de/safetube/android/system/BatteryOptimizationTest.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/push/ParentPushHandler.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/push/ParentNotifier.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/push/ParentPushService.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/push/DecisionReceiver.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/push/BootReceiver.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/push/OpenRequestsWorker.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/push/PushControl.kt`
+- Create: `android/parent/src/main/kotlin/de/safetube/parent/push/PushSetupHints.kt`
 - Modify: `android/parent/src/main/AndroidManifest.xml` (ganz ersetzen)
-- Modify: `android/parent/src/main/kotlin/de/isoletta/safetube/parent/AppContainer.kt`, `ParentApp.kt`, `MainActivity.kt`, `nav/ParentNavHost.kt`
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/push/ParentPushHandlerTest.kt`
-- Test: `android/parent/src/test/kotlin/de/isoletta/safetube/parent/push/ParentNotifierTest.kt`
+- Modify: `android/parent/src/main/kotlin/de/safetube/parent/AppContainer.kt`, `ParentApp.kt`, `MainActivity.kt`, `nav/ParentNavHost.kt`
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/push/ParentPushHandlerTest.kt`
+- Test: `android/parent/src/test/kotlin/de/safetube/parent/push/ParentNotifierTest.kt`
 
 Spec 7 (Benachrichtigungen) und 8 (Push über ntfy): Vordergrunddienst mit Dauerverbindung, ständige Benachrichtigung „verbunden“ (eigener Kanal, in Android ausblendbar), Bitte um Ausnahme von der Akku-Optimierung. Neue Anfrage → Benachrichtigung mit [Freigeben] [Ablehnen]; anderes Elternteil hat entschieden → Info, offene Benachrichtigung verschwindet; Belohnung abgelaufen / neues Gerät → Info; Gerät meldet sich nicht / Störung → Warnung. Doppelte Meldungen (Push und 15-Minuten-Abgleich) verhindert die gemeinsame Liste gemeldeter Anfragen (`SessionStore.markSeen`/`newRequests`). Die Bitte um Benachrichtigungs-Erlaubnis (Android 13+) und um die Akku-Ausnahme erscheinen als Hinweiskarten oben in der Übersicht.
 
 - [ ] **Step 1: Failing tests schreiben**
 
-`android/core-android/src/test/kotlin/de/isoletta/safetube/android/system/BatteryOptimizationTest.kt`:
+`android/core-android/src/test/kotlin/de/safetube/android/system/BatteryOptimizationTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.android.system
+package de.safetube.android.system
 
 import android.content.Context
 import android.os.PowerManager
@@ -9429,13 +9510,13 @@ class BatteryOptimizationTest {
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/push/ParentPushHandlerTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/push/ParentPushHandlerTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
-import de.isoletta.safetube.core.push.NtfyEvent
-import de.isoletta.safetube.core.push.ParentPush
+import de.safetube.core.push.NtfyEvent
+import de.safetube.core.push.ParentPush
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -9483,16 +9564,16 @@ class ParentPushHandlerTest {
 }
 ```
 
-`android/parent/src/test/kotlin/de/isoletta/safetube/parent/push/ParentNotifierTest.kt`:
+`android/parent/src/test/kotlin/de/safetube/parent/push/ParentNotifierTest.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import de.isoletta.safetube.core.push.ParentPush
+import de.safetube.core.push.ParentPush
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -9556,17 +9637,17 @@ class ParentNotifierTest {
 
 - [ ] **Step 2: Tests laufen lassen, Scheitern sehen**
 
-Run: `android/tools/remote-build.sh :core-android:testDebugUnitTest :parent:testDebugUnitTest --tests 'de.isoletta.safetube.parent.push.*'`
+Run: `android/tools/remote-build.sh :core-android:testDebugUnitTest :parent:testDebugUnitTest --tests 'de.safetube.parent.push.*'`
 Expected: FAIL — `Unresolved reference: BatteryOptimization` / `ParentPushHandler` / `ParentNotifier`.
 
 (Gradle wendet `--tests` auf alle genannten Test-Aufgaben an; für `:core-android` findet der Filter keine passenden Klassen. Schlägt der Lauf deshalb mit „No tests found for given includes“ fehl, beide Aufgaben einzeln aufrufen: zuerst `:core-android:testDebugUnitTest`, dann `:parent:testDebugUnitTest --tests '…push.*'`.)
 
 - [ ] **Step 3: Implementieren — `core-android`**
 
-`android/core-android/src/main/kotlin/de/isoletta/safetube/android/system/BatteryOptimization.kt`:
+`android/core-android/src/main/kotlin/de/safetube/android/system/BatteryOptimization.kt`:
 
 ```kotlin
-package de.isoletta.safetube.android.system
+package de.safetube.android.system
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -9588,10 +9669,10 @@ object BatteryOptimization {
 }
 ```
 
-`android/core-android/src/main/kotlin/de/isoletta/safetube/android/push/NtfyForegroundService.kt`:
+`android/core-android/src/main/kotlin/de/safetube/android/push/NtfyForegroundService.kt`:
 
 ```kotlin
-package de.isoletta.safetube.android.push
+package de.safetube.android.push
 
 import android.annotation.SuppressLint
 import android.app.Notification
@@ -9602,10 +9683,10 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.push.NtfyEvent
-import de.isoletta.safetube.core.push.NtfyStream
-import de.isoletta.safetube.core.push.PushSignal
+import de.safetube.core.api.attempt
+import de.safetube.core.push.NtfyEvent
+import de.safetube.core.push.NtfyStream
+import de.safetube.core.push.PushSignal
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -9675,13 +9756,13 @@ abstract class NtfyForegroundService : LifecycleService() {
 
 - [ ] **Step 4: Implementieren — `parent`**
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/ParentPushHandler.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/push/ParentPushHandler.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
-import de.isoletta.safetube.core.push.NtfyEvent
-import de.isoletta.safetube.core.push.ParentPush
+import de.safetube.core.push.NtfyEvent
+import de.safetube.core.push.ParentPush
 
 /** Was die App mit Benachrichtigungen tun kann (Android-Teil in ParentNotifier, in Tests ein Fake). */
 interface ParentNotifications {
@@ -9710,10 +9791,10 @@ class ParentPushHandler(
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/ParentNotifier.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/push/ParentNotifier.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
 import android.annotation.SuppressLint
 import android.app.Notification
@@ -9724,9 +9805,9 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import de.isoletta.safetube.core.push.ParentPush
-import de.isoletta.safetube.parent.MainActivity
-import de.isoletta.safetube.parent.R
+import de.safetube.core.push.ParentPush
+import de.safetube.parent.MainActivity
+import de.safetube.parent.R
 import java.util.concurrent.atomic.AtomicInteger
 
 class ParentNotifier(private val context: Context) : ParentNotifications {
@@ -9846,16 +9927,16 @@ class ParentNotifier(private val context: Context) : ParentNotifications {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/ParentPushService.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/push/ParentPushService.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
 import android.app.Notification
-import de.isoletta.safetube.android.push.NtfyForegroundService
-import de.isoletta.safetube.android.push.PushConnection
-import de.isoletta.safetube.core.push.NtfyEvent
-import de.isoletta.safetube.parent.container
+import de.safetube.android.push.NtfyForegroundService
+import de.safetube.android.push.PushConnection
+import de.safetube.core.push.NtfyEvent
+import de.safetube.parent.container
 import okhttp3.OkHttpClient
 
 class ParentPushService : NtfyForegroundService() {
@@ -9879,22 +9960,22 @@ class ParentPushService : NtfyForegroundService() {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/DecisionReceiver.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/push/DecisionReceiver.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import de.isoletta.safetube.core.api.Decision
-import de.isoletta.safetube.core.api.DecisionAction
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.api.Scope
-import de.isoletta.safetube.core.api.attempt
-import de.isoletta.safetube.core.api.userMessage
-import de.isoletta.safetube.parent.MainActivity
-import de.isoletta.safetube.parent.container
+import de.safetube.core.api.Decision
+import de.safetube.core.api.DecisionAction
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.api.Scope
+import de.safetube.core.api.attempt
+import de.safetube.core.api.userMessage
+import de.safetube.parent.MainActivity
+import de.safetube.parent.container
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -9931,21 +10012,21 @@ class DecisionReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_APPROVE = "de.isoletta.safetube.parent.APPROVE"
-        const val ACTION_REJECT = "de.isoletta.safetube.parent.REJECT"
+        const val ACTION_APPROVE = "de.safetube.parent.APPROVE"
+        const val ACTION_REJECT = "de.safetube.parent.REJECT"
     }
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/BootReceiver.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/push/BootReceiver.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import de.isoletta.safetube.parent.container
+import de.safetube.parent.container
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -9966,10 +10047,10 @@ class BootReceiver : BroadcastReceiver() {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/OpenRequestsWorker.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/push/OpenRequestsWorker.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
 import android.content.Context
 import androidx.work.Constraints
@@ -9979,11 +10060,11 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import de.isoletta.safetube.core.api.ApiException
-import de.isoletta.safetube.core.api.RequestFilter
-import de.isoletta.safetube.core.api.RequestStatus
-import de.isoletta.safetube.core.push.OpenRequestCheck
-import de.isoletta.safetube.parent.container
+import de.safetube.core.api.ApiException
+import de.safetube.core.api.RequestFilter
+import de.safetube.core.api.RequestStatus
+import de.safetube.core.push.OpenRequestCheck
+import de.safetube.parent.container
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
@@ -10022,10 +10103,10 @@ class OpenRequestsWorker(context: Context, params: WorkerParameters) : Coroutine
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/PushControl.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/push/PushControl.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
 import android.content.Context
 import android.content.Intent
@@ -10057,10 +10138,10 @@ object PushControl {
 }
 ```
 
-`android/parent/src/main/kotlin/de/isoletta/safetube/parent/push/PushSetupHints.kt`:
+`android/parent/src/main/kotlin/de/safetube/parent/push/PushSetupHints.kt`:
 
 ```kotlin
-package de.isoletta.safetube.parent.push
+package de.safetube.parent.push
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -10083,7 +10164,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import de.isoletta.safetube.android.system.BatteryOptimization
+import de.safetube.android.system.BatteryOptimization
 
 /** Hinweiskarten oben in der Übersicht, solange Benachrichtigungen oder die Akku-Ausnahme fehlen. */
 @Composable
@@ -10192,7 +10273,7 @@ private fun HintCard(text: String, button: String, onClick: () -> Unit) {
 class AppContainer(private val context: Context) {
 ```
 
-und unter `val youtube …` einfügen (Import `de.isoletta.safetube.parent.push.ParentNotifier`):
+und unter `val youtube …` einfügen (Import `de.safetube.parent.push.ParentNotifier`):
 
 ```kotlin
     val notifier: ParentNotifier by lazy { ParentNotifier(context) }
@@ -10201,11 +10282,11 @@ und unter `val youtube …` einfügen (Import `de.isoletta.safetube.parent.push.
 `ParentApp.kt` ändern — Kanäle beim App-Start anlegen (billig, idempotent):
 
 ```kotlin
-package de.isoletta.safetube.parent
+package de.safetube.parent
 
 import android.app.Application
 import android.content.Context
-import de.isoletta.safetube.parent.push.ParentNotifier
+import de.safetube.parent.push.ParentNotifier
 
 class ParentApp : Application() {
     /** Erst beim ersten Zugriff gebaut — Robolectric-Tests, die ihn nicht brauchen, bleiben schnell. */
@@ -10221,7 +10302,7 @@ val Context.container: AppContainer
     get() = (applicationContext as ParentApp).container
 ```
 
-`MainActivity.kt` ändern — im `setContent`-Block die beiden Stellen ersetzen (Importe `de.isoletta.safetube.parent.push.PushControl`, `de.isoletta.safetube.parent.push.PushSetupHints`):
+`MainActivity.kt` ändern — im `setContent`-Block die beiden Stellen ersetzen (Importe `de.safetube.parent.push.PushControl`, `de.safetube.parent.push.PushSetupHints`):
 
 ```kotlin
                 LaunchedEffect(Unit) {
@@ -10443,6 +10524,7 @@ Achtung: Thinkbook- und CI-Build sind mit **verschiedenen Debug-Schlüsseln** si
 | 8 | Zweites Elternteil-Handy (falls schon eingerichtet) | Info „<Name> hat freigegeben“ |
 | 9 | `fake-kid.sh request-channel UCuAXFkgsw1L7xaCfnd5JJOw dQw4w9WgXcQ`, Benachrichtigung antippen | Detail öffnet sich; „Letzte Videos des Kanals“ (10); Vorschau eines Videos spielt; „Nur das Video … freigeben“ vorhanden |
 | 10 | „Ablehnen + Kanal sperren“ mit Grund | Snackbar; Regel „Kanal · Test · gesperrt“ |
+| 10a | `fake-kid.sh request-channel UCuAXFkgsw1L7xaCfnd5JJOw` erneut (Kanal ist jetzt gesperrt) | Benachrichtigung „Test bittet um Aufhebung einer Sperre“; in der Liste „Kanal (gesperrt)“, im Detail der Hinweis; Freigeben ersetzt die Sperre durch „erlaubt“ |
 | 11 | Regeln → Neue Regel → Link `https://www.youtube.com/@RickAstleyYT` → Erlauben → für alle Kinder | Regel „Kanal · alle Kinder · erlaubt“ (ID `UC…`) |
 | 12 | Regeln → Neue Regel → Suchen „Sendung mit der Maus“ → Kanal wählen → Speichern; danach bearbeiten (Sperren) und löschen | Liste aktualisiert sich jeweils |
 | 13 | `fake-kid.sh watch dQw4w9WgXcQ UCuAXFkgsw1L7xaCfnd5JJOw 600` | Übersicht „Heute geschaut: 10 min“; Verlauf zeigt den Eintrag; Statistik 7 Tage mit Balken |
@@ -10451,12 +10533,13 @@ Achtung: Thinkbook- und CI-Build sind mit **verschiedenen Debug-Schlüsseln** si
 | 16 | Handy neu starten, dann neue Anfrage | Benachrichtigung kommt (BootReceiver) |
 | 17 | Eltern → Passwort ändern; abmelden; neu anmelden | Klappt mit neuem Passwort; nach Abmelden keine ständige Benachrichtigung mehr |
 | 18 | Kind-Einstellungen → fake-kid-Gerät entkoppeln | Gerät „entkoppelt …“; `fake-kid.sh request-video …` scheitert mit 401 |
+| 19 | Neues Testkind anlegen, koppeln (`fake-kid.sh pair …`), dann Kind-Einstellungen → „… löschen“ → bestätigen | Zurück in der Übersicht, Kind weg; seine Regeln und Anfragen weg, Regeln für alle Kinder noch da; `fake-kid.sh request-video …` scheitert mit 401 |
 
 Ergebnisse (auch Abweichungen) in `CLAUDE.local.md` unter „Laufende Notizen“ festhalten. Fehler werden als eigene kleine Tasks nachgezogen (Test zuerst).
 
 - [ ] **Step 4: Aufräumen**
 
-Das Testkind und die Testregeln kann Jessica in der App löschen bzw. behalten (Kinder lassen sich in Version 1 nicht löschen — der Server hat dafür keinen Endpunkt; ein umbenanntes Testkind stört nicht). Token-Datei des Skripts entfernen: `rm ~/.config/safetube-fake-kid-token`.
+Testkind und Testregeln in der App löschen (Kind-Einstellungen → „… löschen“, Regeln einzeln). Token-Datei des Skripts entfernen: `rm ~/.config/safetube-fake-kid-token`.
 
 ---
 
