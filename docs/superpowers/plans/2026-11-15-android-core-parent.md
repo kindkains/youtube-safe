@@ -2281,11 +2281,16 @@ class SeenIdsTest {
         assertEquals("", SeenIds.decode(null).encode())
     }
 
-    private fun request(id: Int, type: TargetType = TargetType.VIDEO, message: String = "") = ContentRequest(
+    private fun request(
+        id: Int,
+        type: TargetType = TargetType.VIDEO,
+        message: String = "",
+        liftsBlock: Boolean = false,
+    ) = ContentRequest(
         id = id, childId = 1, childName = "Mia", targetType = type, targetId = "dQw4w9WgXcQ", title = "Maus",
         channelId = "UCx", channelName = "Die Maus", url = "", thumbnailUrl = "", childMessage = message,
         sourceVideoId = "", sourceVideoTitle = "", status = RequestStatus.OPEN, decidedByName = null,
-        decidedAt = null, reason = "", createdAt = Instant.parse("2026-11-15T06:00:00Z"),
+        decidedAt = null, reason = "", createdAt = Instant.parse("2026-11-15T06:00:00Z"), liftsBlock = liftsBlock,
     )
 
     @Test
@@ -2306,6 +2311,13 @@ class SeenIdsTest {
 
         assertEquals(ParentPush.NewRequest(3, "Mia bittet um Freigabe", "Video: Maus (Die Maus)\n„bitte!“"), video)
         assertEquals(ParentPush.NewRequest(4, "Mia bittet um Freigabe", "Kanal: Maus"), channel)
+    }
+
+    @Test
+    fun `Aufhebung einer Sperre im Wortlaut des Servers`() {
+        val lift = OpenRequestCheck.notificationFor(request(5, liftsBlock = true))
+
+        assertEquals("Mia bittet um Aufhebung einer Sperre", lift.title)
     }
 }
 ```
@@ -2403,7 +2415,8 @@ object OpenRequestCheck {
             message += " (${request.channelName})"
         }
         if (request.childMessage.isNotEmpty()) message += "\n„${request.childMessage}“"
-        return ParentPush.NewRequest(request.id, "${request.childName} bittet um Freigabe", message)
+        val asks = if (request.liftsBlock) "um Aufhebung einer Sperre" else "um Freigabe"
+        return ParentPush.NewRequest(request.id, "${request.childName} bittet $asks", message)
     }
 }
 ```
@@ -2411,7 +2424,7 @@ object OpenRequestCheck {
 - [ ] **Step 4: Tests laufen lassen, grün sehen**
 
 Run: `cd android && ./gradlew --console=plain :core:test --tests 'de.safetube.core.push.ParentPushTest' --tests 'de.safetube.core.push.SeenIdsTest'`
-Expected: PASS (9 Tests).
+Expected: PASS (10 Tests).
 
 - [ ] **Step 5: Commit**
 
