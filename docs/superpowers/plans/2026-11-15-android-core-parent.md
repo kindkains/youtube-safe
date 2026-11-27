@@ -4284,6 +4284,10 @@ class LoginViewModelTest {
 package de.safetube.parent.login
 
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -4307,12 +4311,14 @@ class LoginScreenTest {
         val typed = mutableListOf<String>()
         var submitted = 0
         compose.setContent {
+            // Zustand halten wie das ViewModel, sonst meldet das Feld beim Fokuswechsel den alten (leeren) Wert.
+            var state by remember { mutableStateOf(LoginState(server = "https://s")) }
             SafeTubeTheme {
                 LoginContent(
-                    state = LoginState(server = "https://s"),
-                    onServer = { typed += "server:$it" },
-                    onEmail = { typed += "email:$it" },
-                    onPassword = { typed += "password:$it" },
+                    state = state,
+                    onServer = { typed += "server:$it"; state = state.copy(server = it) },
+                    onEmail = { typed += "email:$it"; state = state.copy(email = it) },
+                    onPassword = { typed += "password:$it"; state = state.copy(password = it) },
                     onSubmit = { submitted++ },
                 )
             }
