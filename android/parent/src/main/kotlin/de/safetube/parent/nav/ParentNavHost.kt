@@ -27,6 +27,7 @@ import androidx.navigation.navArgument
 import de.safetube.parent.login.LoginScreen
 import de.safetube.parent.overview.OverviewActions
 import de.safetube.parent.overview.OverviewScreen
+import de.safetube.parent.requests.RequestDetailScreen
 import de.safetube.parent.requests.RequestsScreen
 
 private data class TopLevel(val route: String, val label: String, val icon: ImageVector)
@@ -90,6 +91,13 @@ fun ParentNavHost(
                 )
             }
             // Routen
+            composable(Routes.REQUEST, arguments = requestIdArg) { entry ->
+                RequestDetailScreen(
+                    requestId = entry.arguments!!.getInt("requestId"),
+                    onBack = { nav.popBackStack() },
+                    onDecided = { },
+                )
+            }
             composable(Routes.REQUESTS) {
                 RequestsScreen(onOpen = { nav.navigate(Routes.request(it)) })
             }
