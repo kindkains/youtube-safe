@@ -129,10 +129,11 @@ fun ParentNavHost(
                 RulesScreen(onAdd = { nav.navigate(Routes.RULE_ADD) })
             }
             composable(Routes.REQUEST, arguments = requestIdArg) { entry ->
+                val container = LocalContext.current.container
                 RequestDetailScreen(
                     requestId = entry.arguments!!.getInt("requestId"),
                     onBack = { nav.popBackStack() },
-                    onDecided = { },
+                    onDecided = { container.notifier.cancelRequest(it) },
                 )
             }
             composable(Routes.REQUESTS) {

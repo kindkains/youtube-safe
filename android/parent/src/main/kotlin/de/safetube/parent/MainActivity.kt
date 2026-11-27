@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import de.safetube.android.ui.SafeTubeTheme
 import de.safetube.parent.nav.ParentNavHost
+import de.safetube.parent.push.PushControl
+import de.safetube.parent.push.PushSetupHints
 import de.safetube.parent.ui.Loading
 
 class MainActivity : ComponentActivity() {
@@ -27,15 +29,25 @@ class MainActivity : ComponentActivity() {
         setContent {
             SafeTubeTheme {
                 var loggedIn by remember { mutableStateOf<Boolean?>(null) }
-                LaunchedEffect(Unit) { loggedIn = appContainer.sessionStore.load() != null }
+                LaunchedEffect(Unit) {
+                    loggedIn = appContainer.sessionStore.load() != null
+                    if (loggedIn == true) PushControl.start(this@MainActivity)
+                }
                 when (val state = loggedIn) {
                     null -> Loading()
                     else -> ParentNavHost(
                         loggedIn = state,
                         openRequestId = openRequest.value,
                         onRequestOpened = { openRequest.value = null },
-                        onLoggedIn = { loggedIn = true },
-                        onLoggedOut = { loggedIn = false },
+                        onLoggedIn = {
+                            loggedIn = true
+                            PushControl.start(this@MainActivity)
+                        },
+                        onLoggedOut = {
+                            PushControl.stop(this@MainActivity)
+                            loggedIn = false
+                        },
+                        overviewHeader = { PushSetupHints() },
                     )
                 }
             }

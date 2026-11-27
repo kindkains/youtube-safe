@@ -7,6 +7,7 @@ import de.safetube.core.api.ParentApi
 import de.safetube.core.extractor.NewPipeSource
 import de.safetube.core.extractor.OkHttpDownloader
 import de.safetube.core.extractor.YouTubeSource
+import de.safetube.parent.push.ParentNotifier
 import de.safetube.parent.session.Auth
 import de.safetube.parent.session.SessionStore
 import de.safetube.parent.session.sessionDataStore
@@ -14,7 +15,7 @@ import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 
 /** Alle langlebigen Objekte der App, von Hand verdrahtet (kein DI-Framework). */
-class AppContainer(context: Context) {
+class AppContainer(private val context: Context) {
     val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -29,6 +30,8 @@ class AppContainer(context: Context) {
     val auth = Auth(sessionStore) { server, token -> apiFor({ server }, { token }) }
 
     val youtube: YouTubeSource by lazy { NewPipeSource(OkHttpDownloader(http)) }
+
+    val notifier: ParentNotifier by lazy { ParentNotifier(context) }
 
     private fun apiFor(server: () -> String, token: () -> String?): ParentApi =
         HttpParentApi(HttpTransport(http, server, token))
