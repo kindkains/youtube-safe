@@ -17,6 +17,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -25,10 +26,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import de.safetube.parent.child.ChildSettingsScreen
+import de.safetube.parent.container
 import de.safetube.parent.history.HistoryScreen
 import de.safetube.parent.login.LoginScreen
 import de.safetube.parent.overview.OverviewActions
 import de.safetube.parent.overview.OverviewScreen
+import de.safetube.parent.parents.ParentsScreen
 import de.safetube.parent.requests.RequestDetailScreen
 import de.safetube.parent.requests.RequestsScreen
 import de.safetube.parent.reward.RewardScreen
@@ -97,6 +100,16 @@ fun ParentNavHost(
                 )
             }
             // Routen
+            composable(Routes.PARENTS) {
+                val container = LocalContext.current.container
+                ParentsScreen(
+                    onLoggedOut = {
+                        onLoggedOut()
+                        nav.toLogin()
+                    },
+                    logout = { container.auth.logout(container.api) },
+                )
+            }
             composable(Routes.CHILD, arguments = childIdArg) { entry ->
                 ChildSettingsScreen(childId = entry.arguments!!.getInt("childId"), onBack = { nav.popBackStack() })
             }
