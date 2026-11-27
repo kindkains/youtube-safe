@@ -24,13 +24,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import de.safetube.parent.history.HistoryScreen
 import de.safetube.parent.login.LoginScreen
 import de.safetube.parent.overview.OverviewActions
 import de.safetube.parent.overview.OverviewScreen
 import de.safetube.parent.requests.RequestDetailScreen
 import de.safetube.parent.requests.RequestsScreen
+import de.safetube.parent.reward.RewardScreen
 import de.safetube.parent.rules.AddRuleScreen
 import de.safetube.parent.rules.RulesScreen
+import de.safetube.parent.stats.StatsScreen
 
 private data class TopLevel(val route: String, val label: String, val icon: ImageVector)
 
@@ -93,6 +96,15 @@ fun ParentNavHost(
                 )
             }
             // Routen
+            composable(Routes.REWARD, arguments = childIdArg) { entry ->
+                RewardScreen(childId = entry.arguments!!.getInt("childId"), onBack = { nav.popBackStack() })
+            }
+            composable(Routes.STATS, arguments = childIdArg) { entry ->
+                StatsScreen(childId = entry.arguments!!.getInt("childId"), onBack = { nav.popBackStack() })
+            }
+            composable(Routes.HISTORY, arguments = childIdArg) { entry ->
+                HistoryScreen(childId = entry.arguments!!.getInt("childId"), onBack = { nav.popBackStack() })
+            }
             composable(Routes.RULE_ADD) {
                 AddRuleScreen(onDone = { nav.popBackStack() })
             }
