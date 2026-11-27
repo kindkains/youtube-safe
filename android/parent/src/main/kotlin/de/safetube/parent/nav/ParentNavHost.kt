@@ -29,6 +29,7 @@ import de.safetube.parent.overview.OverviewActions
 import de.safetube.parent.overview.OverviewScreen
 import de.safetube.parent.requests.RequestDetailScreen
 import de.safetube.parent.requests.RequestsScreen
+import de.safetube.parent.rules.RulesScreen
 
 private data class TopLevel(val route: String, val label: String, val icon: ImageVector)
 
@@ -91,6 +92,9 @@ fun ParentNavHost(
                 )
             }
             // Routen
+            composable(Routes.RULES) {
+                RulesScreen(onAdd = { nav.navigate(Routes.RULE_ADD) })
+            }
             composable(Routes.REQUEST, arguments = requestIdArg) { entry ->
                 RequestDetailScreen(
                     requestId = entry.arguments!!.getInt("requestId"),
