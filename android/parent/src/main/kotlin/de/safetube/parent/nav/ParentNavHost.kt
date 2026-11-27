@@ -24,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import de.safetube.parent.child.ChildSettingsScreen
 import de.safetube.parent.history.HistoryScreen
 import de.safetube.parent.login.LoginScreen
 import de.safetube.parent.overview.OverviewActions
@@ -96,6 +97,9 @@ fun ParentNavHost(
                 )
             }
             // Routen
+            composable(Routes.CHILD, arguments = childIdArg) { entry ->
+                ChildSettingsScreen(childId = entry.arguments!!.getInt("childId"), onBack = { nav.popBackStack() })
+            }
             composable(Routes.REWARD, arguments = childIdArg) { entry ->
                 RewardScreen(childId = entry.arguments!!.getInt("childId"), onBack = { nav.popBackStack() })
             }
