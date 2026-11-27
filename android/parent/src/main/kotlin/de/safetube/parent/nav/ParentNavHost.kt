@@ -29,6 +29,7 @@ import de.safetube.parent.overview.OverviewActions
 import de.safetube.parent.overview.OverviewScreen
 import de.safetube.parent.requests.RequestDetailScreen
 import de.safetube.parent.requests.RequestsScreen
+import de.safetube.parent.rules.AddRuleScreen
 import de.safetube.parent.rules.RulesScreen
 
 private data class TopLevel(val route: String, val label: String, val icon: ImageVector)
@@ -92,6 +93,9 @@ fun ParentNavHost(
                 )
             }
             // Routen
+            composable(Routes.RULE_ADD) {
+                AddRuleScreen(onDone = { nav.popBackStack() })
+            }
             composable(Routes.RULES) {
                 RulesScreen(onAdd = { nav.navigate(Routes.RULE_ADD) })
             }
